@@ -1,2 +1,2 @@
 # Tarun-dev
-AI, robotics, and software engineering projects with a focus on system design and optimization.
+🚀 AI • Robotics • System Design | 🤖 Building intelligent systems & autonomous solutions | ⚙️ Focused on model optimization, embedded engineering & real-world problem solving | 🔬 Research-driven development with practical implementation
