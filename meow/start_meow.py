@@ -64,7 +64,12 @@ def kaggle_api(cfg):
         from kaggle.api.kaggle_api_extended import KaggleApi
     except ImportError:
         say("📦 Installing the Kaggle API (one time)…")
-        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "kaggle"], check=True)
+        # kaggle's optional notebook-conversion extra (jupytext → pyyaml) needs a C compiler on brand-new Pythons,
+        # and we never use it — so install kaggle without it, plus its pure-Python dependencies.
+        pip = [sys.executable, "-m", "pip", "install", "-q", "--disable-pip-version-check"]
+        subprocess.run(pip + ["--no-deps", "kaggle"], check=True)
+        subprocess.run(pip + ["bleach", "kagglesdk", "packaging", "protobuf", "python-dateutil", "python-dotenv",
+                              "python-slugify", "requests", "tqdm", "urllib3"], check=True)
         from kaggle.api.kaggle_api_extended import KaggleApi
     api = KaggleApi(); api.authenticate()
     return api
