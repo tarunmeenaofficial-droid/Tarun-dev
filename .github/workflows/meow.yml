@@ -1,0 +1,38 @@
+# Put this file at .github/workflows/meow.yml on the DEFAULT branch (main) — then GitHub shows a "Run workflow" button
+# (Actions tab → Meow → Run workflow), also in the GitHub phone app. Add these repo secrets first
+# (Settings → Secrets and variables → Actions → New repository secret):
+#   KAGGLE_USERNAME, KAGGLE_TOKEN, MEOW_NTFY_TOPIC, MEOW_PASSWORD, NGROK_AUTH_TOKEN, SERPER_API_KEY, TAVILY_API_KEY
+name: Meow
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do"
+        type: choice
+        options: [start, setup, status, logs]
+        default: start
+      hours:
+        description: "Max hours to keep Meow on (it also powers off when idle)"
+        default: "6"
+jobs:
+  meow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: ${{ inputs.action }}
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_TOKEN: ${{ secrets.KAGGLE_TOKEN }}
+          MEOW_NTFY_TOPIC: ${{ secrets.MEOW_NTFY_TOPIC }}
+          MEOW_PASSWORD: ${{ secrets.MEOW_PASSWORD }}
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          MEOW_MAX_HOURS: ${{ inputs.hours }}
+        run: |
+          pip install -q kaggle
+          curl -fsSL "https://raw.githubusercontent.com/tarunmeenaofficial-droid/Tarun-dev/meow/meow/start_meow.py" -o start_meow.py
+          python start_meow.py ${{ inputs.action }}
