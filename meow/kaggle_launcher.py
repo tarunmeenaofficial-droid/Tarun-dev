@@ -43,6 +43,9 @@ def llama_gpu_ok():
     chk = "import llama_cpp, sys; sys.exit(0 if llama_cpp.llama_supports_gpu_offload() else 1)"
     return subprocess.run([sys.executable, "-c", chk], capture_output=True).returncode == 0
 
+LLAMA_DEPS = "'diskcache>=5.6.1' 'jinja2>=2.11.3' 'typing-extensions>=4.5.0' 'numpy>=1.20.0'"
+if not llama_gpu_ok():
+    sh(f"{sys.executable} -m pip install -q {LLAMA_DEPS}")             # llama-cpp-python's own small deps
 if not llama_gpu_ok():
     wheels = glob.glob("/kaggle/input/**/llama_cpp_python*.whl", recursive=True)
     if wheels:                                                      # fastest: your saved wheel (Kaggle dataset)
@@ -51,12 +54,14 @@ if not llama_gpu_ok():
     if not llama_gpu_ok():
         print("⚡ Installing llama-cpp-python (CUDA build, prebuilt)…")
         cu = "cu124"
-        sh(f"{sys.executable} -m pip install -q --force-reinstall --no-cache-dir --prefer-binary llama-cpp-python "
+        sh(f"{sys.executable} -m pip install -q --force-reinstall --no-deps --no-cache-dir --only-binary=llama-cpp-python llama-cpp-python "
            f"--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/{cu}")
     if not llama_gpu_ok():
         print("🔧 No prebuilt GPU wheel fits — compiling with CUDA (one time, ~15-25 min). The wheel is saved to "
               f"{W}/wheels — add it as a Kaggle Dataset and next sessions install in seconds.")
         os.makedirs(f"{W}/wheels", exist_ok=True)
+        _nv = next((d for d in ["/usr/local/cuda/bin"] + sorted(glob.glob("/usr/local/cuda-*/bin"), reverse=True) if os.path.exists(d + "/nvcc")), None)
+        if _nv: os.environ["CUDACXX"] = _nv + "/nvcc"; os.environ["PATH"] = _nv + ":" + os.environ["PATH"]
         ok = sh(f'CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=60;75" FORCE_CMAKE=1 {sys.executable} -m pip wheel '
                 f'--no-deps --no-cache-dir llama-cpp-python -w {W}/wheels', quiet=False)
         built = glob.glob(f"{W}/wheels/llama_cpp_python*.whl")

@@ -17,8 +17,27 @@ print(f"⬇️  {REPO_ID}/{GGUF}", flush=True)
 hf_hub_download(repo_id=REPO_ID, filename=GGUF, local_dir=f"{W}/model")
 print(f"✅ model saved ({os.path.getsize(f'{W}/model/{GGUF}') / 1e9:.1f} GB) in {time.time() - t0:.0f}s", flush=True)
 
-ok = lambda: subprocess.run([sys.executable, "-c", "import llama_cpp,sys; sys.exit(0 if llama_cpp.llama_supports_gpu_offload() else 1)"]).returncode == 0
+DEPS = ["diskcache>=5.6.1", "jinja2>=2.11.3", "typing-extensions>=4.5.0", "numpy>=1.20.0"]   # llama-cpp-python's own deps
+
+
+def ok(show=False):
+    r = subprocess.run([sys.executable, "-c", "import llama_cpp,sys; print('llama_cpp', llama_cpp.__version__); "
+                        "sys.exit(0 if llama_cpp.llama_supports_gpu_offload() else 1)"], capture_output=True, text=True)
+    if show or r.returncode: print((r.stdout + r.stderr)[-1500:], flush=True)
+    return r.returncode == 0
+
+
+def cuda_env():
+    env = dict(os.environ, CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=60;75", FORCE_CMAKE="1")
+    for d in ("/usr/local/cuda/bin", *sorted(glob.glob("/usr/local/cuda-*/bin"), reverse=True)):
+        if os.path.exists(f"{d}/nvcc"):
+            env["CUDACXX"] = f"{d}/nvcc"; env["PATH"] = f"{d}:{env.get('PATH', '')}"
+            env["CUDA_HOME"] = os.path.dirname(d); break
+    return env
+
+
 os.makedirs(f"{W}/wheels", exist_ok=True)
+pip("install", "-q", *DEPS)
 pip("download", "-q", "--no-deps", "--only-binary=:all:", "llama-cpp-python", "-d", f"{W}/wheels",
     "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu124")
 whl = glob.glob(f"{W}/wheels/llama_cpp_python*.whl")
@@ -26,9 +45,12 @@ if whl: pip("install", "-q", "--force-reinstall", "--no-deps", whl[0])
 if not (whl and ok()):
     for w in whl: os.remove(w)
     print("🔧 compiling llama-cpp-python with CUDA (15-25 min)…", flush=True)
-    env = dict(os.environ, CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=60;75", FORCE_CMAKE="1")
-    subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "--no-cache-dir", "llama-cpp-python", "-w", f"{W}/wheels"], env=env, check=False)
+    env = cuda_env(); print("   nvcc:", env.get("CUDACXX", "NOT FOUND"), flush=True)
+    r = subprocess.run([sys.executable, "-m", "pip", "wheel", "-v", "--no-deps", "--no-cache-dir", "llama-cpp-python", "-w", f"{W}/wheels"],
+                       env=env, capture_output=True, text=True)
+    if r.returncode: print("❌ compile failed — last lines:\n" + (r.stdout + r.stderr)[-4000:], flush=True)
     whl = glob.glob(f"{W}/wheels/llama_cpp_python*.whl")
     if whl: pip("install", "-q", "--force-reinstall", "--no-deps", whl[0])
-print("✅ GPU engine:", whl[0] if whl else None, "| GPU offload:", ok(), flush=True)
+ok(show=True)
+print("✅ GPU engine:", os.path.basename(whl[0]) if whl else None, "| GPU offload:", ok(), flush=True)
 print(f"🎉 Cache ready in {(time.time() - t0) / 60:.0f} min. Every Meow start now skips the download.", flush=True)
