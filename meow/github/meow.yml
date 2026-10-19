@@ -2,6 +2,7 @@
 # (Actions tab → Meow → Run workflow), also in the GitHub phone app. Add these repo secrets first
 # (Settings → Secrets and variables → Actions → New repository secret):
 #   KAGGLE_USERNAME, KAGGLE_TOKEN, MEOW_NTFY_TOPIC, MEOW_PASSWORD, NGROK_AUTH_TOKEN, SERPER_API_KEY, TAVILY_API_KEY
+#   optional (your model backup): MEOW_MODEL_DATASET (you/meow-model), MEOW_MODEL_GH (you/meow-model), MEOW_MODEL_TOKEN
 name: Meow
 on:
   workflow_dispatch:
@@ -9,7 +10,7 @@ on:
       action:
         description: "What to do"
         type: choice
-        options: [start, setup, status, logs]
+        options: [start, status, logs, stop, backup]
         default: start
       hours:
         description: "Max hours to keep Meow on (it also powers off when idle)"
@@ -31,6 +32,9 @@ jobs:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
           SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          MEOW_MODEL_DATASET: ${{ secrets.MEOW_MODEL_DATASET }}
+          MEOW_MODEL_GH: ${{ secrets.MEOW_MODEL_GH }}
+          MEOW_MODEL_TOKEN: ${{ secrets.MEOW_MODEL_TOKEN }}
           MEOW_MAX_HOURS: ${{ inputs.hours }}
         run: |
           pip install -q kaggle

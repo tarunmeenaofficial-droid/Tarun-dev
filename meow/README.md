@@ -26,7 +26,21 @@ Meow starts on a Kaggle GPU through the Kaggle API, sends a notification to your
 - Install the **ntfy** app and subscribe to the topic shown by the script (`meow-…`). You get a notification with an *Open Meow* button every time it starts.
 - To start Meow from the phone, use the GitHub button: copy [`github/meow.yml`](github/meow.yml) to `.github/workflows/` on the `main` branch, then add the repo secrets listed at the top of that file. After that: GitHub app → Actions → **Meow** → *Run workflow*.
 
-**Commands:** `python start_meow.py` (start) · `status` · `logs` · `stop` · `reset` (deletes Meow's Kaggle notebooks for a completely fresh start). In the app, **Power off Meow** in the sidebar releases the GPU right away.
+**Commands:** `python start_meow.py` (start) · `status` · `logs` · `stop` · `backup` · `reset` (deletes Meow's Kaggle notebooks for a completely fresh start; never your model copy). In the app, **Power off Meow** in the sidebar releases the GPU right away.
+
+## Your own copy of the model (backup)
+
+The model normally comes from someone else's Hugging Face repo. Run this once so Meow keeps working even if that repo disappears:
+
+```
+python start_meow.py backup
+```
+
+It starts a CPU job on Kaggle (no GPU queue, no GPU hours) that downloads the model and saves:
+- **a private Kaggle dataset** `<you>/meow-model`. Every start mounts it, so the model is never downloaded again and Meow starts faster.
+- **optionally, a private GitHub repo** `meow-model`: the 15.7 GB file split into parts under 2 GiB as a GitHub release, because normal Git/LFS can't hold it on a free plan. If Hugging Face fails, Meow downloads and joins these parts by itself.
+
+For the GitHub copy, create a **private** repo `meow-model` (github.com/new, tick *Add a README*), then a fine-grained token (github.com/settings/tokens → *Fine-grained* → *Only select repositories*: meow-model → *Contents: Read and write*), and paste it when the backup asks. The backup notebook contains your tokens, so the script deletes it when it's done.
 
 ## Run it on Kaggle (one cell)
 

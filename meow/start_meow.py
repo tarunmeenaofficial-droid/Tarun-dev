@@ -7,6 +7,8 @@
     python start_meow.py logs       show the Kaggle log
     python start_meow.py stop       stop Meow now (frees the GPU)
     python start_meow.py reset      delete Meow's Kaggle notebooks to start completely fresh
+    python start_meow.py backup     one time: save YOUR OWN private copy of the model (Kaggle dataset + optional
+                                    private GitHub repo), so Meow keeps working if the Hugging Face repo vanishes
 
 The first run asks for your keys and saves them in meow_config.json NEXT TO THIS FILE (keep that file private).
 It uses the Kaggle API to start a private notebook with a GPU T4×2, waits for the public link, opens it and sends a
@@ -19,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CFG_PATH = os.path.join(HERE, "meow_config.json")
 REPO, BRANCH = "tarunmeenaofficial-droid/Tarun-dev", "meow"
 RAW = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/meow"
-SERVER_SLUG, CACHE_SLUG = "meow-server", "meow-cache"
+SERVER_SLUG, CACHE_SLUG, BACKUP_SLUG = "meow-server", "meow-cache", "meow-backup"
 CI = bool(os.environ.get("GITHUB_ACTIONS"))
 
 FIELDS = [  # (config key, env var, question, required)
@@ -48,6 +50,8 @@ def load_cfg():
     cfg.setdefault("ntfy_topic", os.environ.get("MEOW_NTFY_TOPIC") or "meow-" + secrets.token_hex(8))
     cfg.setdefault("idle_minutes", int(os.environ.get("MEOW_IDLE_MIN", 40)))
     cfg.setdefault("max_hours", int(os.environ.get("MEOW_MAX_HOURS", 8)))
+    for key, env in (("model_dataset", "MEOW_MODEL_DATASET"), ("model_github", "MEOW_MODEL_GH"), ("github_token", "MEOW_MODEL_TOKEN")):
+        if os.environ.get(env): cfg[key] = os.environ[env]
     if not CI:
         json.dump(cfg, open(CFG_PATH, "w", encoding="utf-8"), indent=2)
     return cfg
@@ -99,17 +103,19 @@ def push(api, folder, meta, code, timeout=None):
     return api.kernels_push(folder, timeout=timeout)
 
 
-def meta_for(user, slug, title, sources=()):
-    return {"id": f"{user}/{slug}", "title": title, "code_file": f"{slug.replace('-', '_')}.py", "language": "python",
-            "kernel_type": "script", "is_private": "true", "enable_gpu": "true", "enable_internet": "true",
-            "machine_shape": "NvidiaTeslaT4", "dataset_sources": [], "competition_sources": [], "model_sources": [],
-            "kernel_sources": list(sources)}
+def meta_for(user, slug, title, sources=(), datasets=(), gpu=True):
+    m = {"id": f"{user}/{slug}", "title": title, "code_file": f"{slug.replace('-', '_')}.py", "language": "python",
+         "kernel_type": "script", "is_private": "true", "enable_gpu": "true" if gpu else "false", "enable_internet": "true",
+         "machine_shape": "NvidiaTeslaT4", "dataset_sources": list(datasets), "competition_sources": [], "model_sources": [],
+         "kernel_sources": list(sources)}
+    if not gpu: m.pop("machine_shape")
+    return m
 
 
 def reset(cfg, api):
     """Delete Meow's Kaggle notebooks (and with them any queued/cancelling runs) for a clean start."""
     user = cfg["kaggle_username"]
-    for slug in (SERVER_SLUG, CACHE_SLUG):
+    for slug in (SERVER_SLUG, CACHE_SLUG, BACKUP_SLUG):   # notebooks only — your model backup is never touched
         try:
             api.kernels_delete(f"{user}/{slug}", no_confirm=True); say(f"🗑️  deleted {user}/{slug}")
         except Exception as e:
@@ -158,13 +164,17 @@ def start(cfg, api, open_browser=True):
         keys = {k: cfg.get(k, "") for k in ("NGROK_AUTH_TOKEN", "SERPER_API_KEY", "TAVILY_API_KEY")}
         extra = {"MEOW_BATCH": "1", "MEOW_PASSWORD": cfg.get("MEOW_PASSWORD", ""), "MEOW_NTFY_TOPIC": cfg["ntfy_topic"],
                  "MEOW_IDLE_MIN": str(cfg["idle_minutes"]), "MEOW_MAX_HOURS": str(cfg["max_hours"])}
+        if cfg.get("model_github"):                         # fallback if Hugging Face is gone and the dataset isn't mounted
+            extra.update({"MEOW_MODEL_GH": cfg["model_github"], "MEOW_MODEL_TOKEN": cfg.get("github_token", "")})
+        datasets = [cfg["model_dataset"]] if cfg.get("model_dataset") else []
         launcher = fetch("kaggle_launcher.py")
         launcher = re.sub(r"KEYS = \{.*?\n\}", "KEYS = " + json.dumps({**keys, **extra}, indent=4), launcher, count=1, flags=re.S)
         with tempfile.TemporaryDirectory() as d:
-            r = push(api, d, meta_for(user, SERVER_SLUG, SERVER_SLUG, [f"{user}/{CACHE_SLUG}"] if cache_ok else []), launcher,
+            r = push(api, d, meta_for(user, SERVER_SLUG, SERVER_SLUG, [f"{user}/{CACHE_SLUG}"] if cache_ok else [], datasets), launcher,
                      timeout=str(int(cfg["max_hours"] * 3600 + 900)))
         if getattr(r, "error", None): sys.exit(f"❌ Kaggle refused the start: {r.error}")
         say(f"🚀 Meow is starting on a Kaggle GPU T4×2 (private notebook: https://www.kaggle.com/code/{sid})")
+        if datasets: say(f"📦 Using your own model copy: kaggle.com/datasets/{datasets[0]}")
         say(f"📱 Phone notification: install the ntfy app and subscribe to topic  {cfg['ntfy_topic']}")
     url = wait_for_url(api, sid, cfg["ntfy_topic"])
     if not url: sys.exit("❌ Meow didn't come up — run `python start_meow.py logs` to see why.")
@@ -205,6 +215,60 @@ def wait_for_url(api, sid, topic, limit=60 * 45):
         time.sleep(15)
     return None
 
+def backup(cfg, api):
+    """One-time: copy the model into YOUR private Kaggle dataset (+ optional private GitHub repo)."""
+    user = cfg["kaggle_username"]; sid = f"{user}/{BACKUP_SLUG}"
+    if "github_token" not in cfg and not CI:
+        say("GitHub copy (optional): paste a GitHub token that can write to a PRIVATE repo, or press Enter to skip.")
+        say("   How: github.com/settings/tokens → Fine-grained → only the meow-model repo → Contents: Read and write.")
+        cfg["github_token"] = input("GitHub token: ").strip()
+        if cfg["github_token"]:
+            repo = input(f"Private repo for the model [{'tarunmeenaofficial-droid'}/meow-model]: ").strip()
+            cfg["model_github_target"] = repo or "tarunmeenaofficial-droid/meow-model"
+        json.dump(cfg, open(CFG_PATH, "w", encoding="utf-8"), indent=2)
+    gh_repo = cfg.get("model_github_target") or cfg.get("model_github") or ""
+    gh_tok = cfg.get("github_token", "")
+    code = fetch("kaggle/backup_kernel.py")
+    conf = {"KAGGLE_USERNAME": user, "KAGGLE_TOKEN": cfg["kaggle_token"], "GH_REPO": gh_repo if gh_tok else "",
+            "GH_TOKEN": gh_tok if gh_repo else "", "NTFY": cfg["ntfy_topic"]}
+    code = re.sub(r"CFG = \{.*?\n\}", lambda m: "CFG = " + json.dumps(conf, indent=4), code, count=1, flags=re.S)
+    if status(api, sid) not in ("running", "queued"):
+        with tempfile.TemporaryDirectory() as d:
+            r = push(api, d, meta_for(user, BACKUP_SLUG, BACKUP_SLUG, gpu=False), code, timeout=str(4 * 3600))
+        if getattr(r, "error", None): sys.exit(f"❌ Kaggle refused the backup job: {r.error}")
+    say(f"💾 Backup job started on Kaggle (CPU — no GPU queue, no GPU hours used): https://www.kaggle.com/code/{sid}")
+    say("   It downloads the model and uploads your private copies: ~20-60 min. Keep this window open")
+    say(f"   (or close it and later run `python start_meow.py backup` again to finish). Phone: ntfy topic {cfg['ntfy_topic']}")
+    seen, t0 = set(), time.time()
+    while time.time() - t0 < 4 * 3600:
+        time.sleep(30)
+        try: log = api.kernels_logs(sid)
+        except Exception: log = ""
+        for line in log.splitlines():
+            line = line.strip()
+            if line and line not in seen and re.match(r"^(💽|⬇️|✅|🔒|⬆️|📁|   ✓|   ⬆️|   retry|BACKUP_)", line):
+                seen.add(line); say("   " + line)
+        st = status(api, sid)
+        if "BACKUP_DONE" in log or st in ("complete", "error", "cancelacknowledged"):
+            break
+    try: log = api.kernels_logs(sid) or log
+    except Exception: pass
+    ok_k = re.search(r"BACKUP_KAGGLE_OK (\S+)", log); ok_g = re.search(r"BACKUP_GITHUB_OK (\S+)", log)
+    if ok_k: cfg["model_dataset"] = ok_k.group(1)
+    if ok_g: cfg["model_github"] = ok_g.group(1)
+    if not CI: json.dump(cfg, open(CFG_PATH, "w", encoding="utf-8"), indent=2)
+    if "BACKUP_DONE" in log or st in ("complete", "error"):
+        try: api.kernels_delete(sid, no_confirm=True)    # the notebook contains your tokens — remove it
+        except Exception: pass
+    if ok_k or ok_g:
+        say("=" * 60)
+        if ok_k: say(f"✅ Your private model copy (Kaggle): https://www.kaggle.com/datasets/{ok_k.group(1)}")
+        if ok_g: say(f"✅ Your private model copy (GitHub): https://github.com/{ok_g.group(1)}/releases/tag/model")
+        say("   Every Meow start now uses YOUR copy first — and starts faster (no download).")
+        say("=" * 60)
+    else:
+        say("⚠️  Backup didn't finish. Last log lines:\n" + "\n".join(log.splitlines()[-15:]))
+
 
 def main():
     cmd = (sys.argv[1] if len(sys.argv) > 1 else "start").lower()
@@ -215,8 +279,11 @@ def main():
         say("   Just double-click Start Meow.bat. (Use `python start_meow.py reset` to clear old Kaggle runs.)")
     elif cmd == "reset": reset(cfg, api)
     elif cmd == "stop": stop(cfg, api)
+    elif cmd == "backup": backup(cfg, api)
     elif cmd == "status":
-        say("Meow server:", status(api, f"{user}/{SERVER_SLUG}"), "| cache:", status(api, f"{user}/{CACHE_SLUG}"))
+        say("Meow server:", status(api, f"{user}/{SERVER_SLUG}"), "| backup job:", status(api, f"{user}/{BACKUP_SLUG}"))
+        say("Your model copies:", cfg.get("model_dataset") or "none yet (run: python start_meow.py backup)",
+            "|", cfg.get("model_github") or "no GitHub copy")
     elif cmd == "logs":
         say(api.kernels_logs(f"{user}/{SERVER_SLUG}")[-6000:])
     else:

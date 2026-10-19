@@ -14,7 +14,11 @@ KEYS = {
     "SERPER_API_KEY":   "",
     "TAVILY_API_KEY":   "",
     "GITHUB_TOKEN":     "",          # only needed if the repo is private
+    "MEOW_MODEL_GH":    "",          # your private model backup repo, e.g. you/meow-model (used if Hugging Face fails)
+    "MEOW_MODEL_TOKEN": "",          # GitHub token that can read that repo
 }
+# Your own model copy on Kaggle (made by `python start_meow.py backup`): right panel → Add Input → Your Work →
+# Datasets → meow-model. Meow finds it automatically and skips the download.
 
 import os, sys, glob, subprocess, importlib, importlib.util, urllib.request, time, shutil
 for k, v in KEYS.items():

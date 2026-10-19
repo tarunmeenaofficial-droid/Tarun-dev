@@ -39,8 +39,10 @@ MAX_NEW_FAST = 2048
 MAX_NEW_THINK = 6144
 ENABLE_CAPTIONS = os.environ.get('MEOW_CAPTIONS','1')=='1'    # BLIP image captions on CPU (one-time ~1.9 GB download)
 PORT = 8000
-MEOW_VERSION = "2026.10.19.2"
+MEOW_VERSION = "2026.10.19.3"
 MEOW_CHANGELOG = [   # newest first — shown in the app under "What's new"
+    {"v": "2026.10.19.3", "items": ["Your own private copy of the model (Kaggle dataset + private GitHub repo): Meow keeps working "
+                                     "even if the Hugging Face repo disappears, and starts faster from the Kaggle copy"]},
     {"v": "2026.10.19.2", "items": ["Start Meow from anywhere with one click (Kaggle API) and get a phone notification with the link",
                                      "Password protection", "Auto power-off when idle to save GPU hours", "What's new panel"]},
     {"v": "2026.10.19", "items": ["One-cell Kaggle launcher with automatic updates from GitHub", "Sharper OCR spacing for IDs"]},
@@ -68,6 +70,45 @@ os.makedirs(WORK_DIR, exist_ok=True)
 # ==========================================================
 # MODEL (reuses the one already in GPU memory when possible)
 # ==========================================================
+def _model_from_github(dest_dir="/tmp/meow_model", workers=4):
+    """Download YOUR private backup (release `model` in MEOW_MODEL_GH, made by `start_meow.py backup`):
+    manifest.json + <2 GiB parts, fetched in parallel straight into place and checked against their sha256."""
+    import hashlib, requests
+    from concurrent.futures import ThreadPoolExecutor
+    repo, tok = os.environ["MEOW_MODEL_GH"], os.environ.get("MEOW_MODEL_TOKEN") or os.environ.get("GITHUB_TOKEN", "")
+    api = os.environ.get("MEOW_GH_API", "https://api.github.com")
+    H = {"Authorization": f"Bearer {tok}"} if tok else {}
+    r = requests.get(f"{api}/repos/{repo}/releases/tags/model", headers=H, timeout=30); r.raise_for_status()
+    assets = {a["name"]: a["url"] for a in r.json()["assets"]}
+    get = lambda name, **kw: requests.get(assets[name], headers={**H, "Accept": "application/octet-stream"}, timeout=(30, 600), **kw)
+    man = get("manifest.json").json()
+    os.makedirs(dest_dir, exist_ok=True)
+    dst = os.path.join(dest_dir, man["file"])
+    if os.path.exists(dst) and os.path.getsize(dst) == man["size"]: return dst
+    tmp = dst + ".download"
+    with open(tmp, "wb") as f: f.truncate(man["size"])
+    offs, o = [], 0
+    for p in man["parts"]: offs.append(o); o += p["size"]
+    def one(i):
+        p = man["parts"][i]
+        for attempt in range(4):
+            try:
+                h, n = hashlib.sha256(), 0
+                with get(p["name"], stream=True) as rr, open(tmp, "r+b") as f:
+                    rr.raise_for_status(); f.seek(offs[i])
+                    for c in rr.iter_content(8 << 20): f.write(c); h.update(c); n += len(c)
+                if n == p["size"] and h.hexdigest() == p["sha256"]: return
+                raise IOError(f"{p['name']} came back damaged")
+            except Exception as e:
+                if attempt == 3: raise
+                print(f"   retrying {p['name']}: {str(e)[:100]}"); time.sleep(5 * (attempt + 1))
+    t = time.time()
+    print(f"⬇️  Downloading your backup from github.com/{repo} ({len(man['parts'])} parts, {man['size'] / 2**30:.1f} GiB)…")
+    with ThreadPoolExecutor(workers) as ex: list(ex.map(one, range(len(man["parts"]))))
+    os.replace(tmp, dst)
+    print(f"✅ Backup downloaded in {time.time() - t:.0f}s")
+    return dst
+
 def _load_llm(ctx):
     from huggingface_hub import hf_hub_download
     from llama_cpp import Llama
@@ -77,7 +118,12 @@ def _load_llm(ctx):
         path = local[0]; print(f"📦 Using model from {os.path.dirname(path)}")
     else:
         os.environ.setdefault("HF_XET_HIGH_PERFORMANCE", "1")   # fastest download path in current huggingface_hub
-        path = hf_hub_download(repo_id=REPO_ID, filename=GGUF_FILENAME)
+        try:
+            path = hf_hub_download(repo_id=REPO_ID, filename=GGUF_FILENAME)
+        except Exception as e:                                   # repo gone / HF down → your own private GitHub copy
+            if not os.environ.get("MEOW_MODEL_GH"): raise
+            print(f"⚠️  Hugging Face download failed ({str(e)[:120]}) — using your GitHub backup")
+            path = _model_from_github()
     kw = dict(model_path=path, n_gpu_layers=-1, n_ctx=ctx, n_batch=512, verbose=False)
     try:
         return Llama(flash_attn=True, **kw)
