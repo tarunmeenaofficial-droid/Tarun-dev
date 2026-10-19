@@ -8,6 +8,27 @@ Tarun's own ChatGPT/Claude-style assistant. It runs a Qwen GGUF model on a free 
 - **Editors:** a visual PDF/image editor, photo-real text replacement inside images, a magic eraser, and 40+ file tools
 - **Extras:** voice mode, Mermaid diagrams, live HTML preview, and a galaxy UI
 
+## Start Meow with one click (recommended)
+
+Meow starts on a Kaggle GPU through the Kaggle API, sends a notification to your phone with the link, and **turns itself off when you stop using it**, so GPU hours aren't wasted.
+
+**On your laptop (Windows):**
+1. Download `start_meow.py` and `Start Meow.bat` into one folder. You need Python from python.org.
+2. Double-click **Start Meow.bat**. The first time, it asks for:
+   - your Kaggle username and API token (kaggle.com → Settings → API → *Generate New Token*)
+   - your ngrok / Serper / Tavily keys
+   - a password for Meow
+
+   These are saved in `meow_config.json` next to the script. That file is private: never upload it.
+3. One time only, run `python start_meow.py setup`. This caches the model and the GPU engine on Kaggle, so later starts take ~2–4 min instead of ~10.
+4. From then on, double-click **Start Meow.bat** → Meow opens in your browser when it's ready.
+
+**On your phone:**
+- Install the **ntfy** app and subscribe to the topic shown by the script (`meow-…`). You get a notification with an *Open Meow* button every time it starts.
+- To start Meow from the phone, use the GitHub button: copy [`github/meow.yml`](github/meow.yml) to `.github/workflows/` on the `main` branch, then add the repo secrets listed at the top of that file. After that: GitHub app → Actions → **Meow** → *Run workflow*.
+
+**Commands:** `python start_meow.py` (start) · `setup` · `status` · `logs`. In the app, **Power off Meow** in the sidebar releases the GPU right away.
+
 ## Run it on Kaggle (one cell)
 
 1. Create a Kaggle notebook. In the right panel set **Accelerator: GPU T4 ×2** and **Internet: ON**.
@@ -32,6 +53,9 @@ The launcher passes these to Meow as environment variables. Kaggle Secrets with 
 | `TAVILY_API_KEY` | pages that block Kaggle, extra Reddit coverage |
 | `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | optional official Reddit API |
 | `GITHUB_TOKEN` | optional: higher GitHub search limits, or a private repo |
+| `MEOW_PASSWORD` | password for the Meow page (strongly recommended with one-click start) |
+| `MEOW_NTFY_TOPIC` | your ntfy topic for "Meow is live" notifications |
+| `MEOW_IDLE_MIN` / `MEOW_MAX_HOURS` | auto power-off after this many idle minutes / hours in total (defaults: 40 min / 8 h) |
 
 ## For developers: how to update Meow
 
@@ -60,4 +84,8 @@ node --check /tmp/meow.js           # syntax-check the page's JavaScript
 python meow/tests/run_tests.py      # offline tests: fake model, mocked internet
 ```
 
-Bump `MEOW_VERSION` in `src/p1.py`, rebuild, commit and push to the `meow` branch. Kaggle picks the update up on the next run.
+For each release:
+1. Bump `MEOW_VERSION` and add an entry to `MEOW_CHANGELOG` in `src/p1.py`. Users see it under *What's new*.
+2. Rebuild, then commit and push to the `meow` branch.
+
+Every start picks the update up automatically.

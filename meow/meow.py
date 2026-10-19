@@ -39,7 +39,18 @@ MAX_NEW_FAST = 2048
 MAX_NEW_THINK = 6144
 ENABLE_CAPTIONS = os.environ.get('MEOW_CAPTIONS','1')=='1'    # BLIP image captions on CPU (one-time ~1.9 GB download)
 PORT = 8000
-MEOW_VERSION = "2026.10.19"
+MEOW_VERSION = "2026.10.19.2"
+MEOW_CHANGELOG = [   # newest first — shown in the app under "What's new"
+    {"v": "2026.10.19.2", "items": ["Start Meow from anywhere with one click (Kaggle API) and get a phone notification with the link",
+                                     "Password protection", "Auto power-off when idle to save GPU hours", "What's new panel"]},
+    {"v": "2026.10.19", "items": ["One-cell Kaggle launcher with automatic updates from GitHub", "Sharper OCR spacing for IDs"]},
+    {"v": "2026.10.18", "items": ["Reddit/Deep research keeps searching until your question is answered (up to 3 rounds)",
+                                   "Comments ranked by relevance; promo/scam comments filtered", "Python code interpreter with charts",
+                                   "YouTube, Wikipedia, papers, GitHub, Stack Overflow, Hacker News sources; reads pasted links",
+                                   "Mermaid diagrams, HTML preview, follow-up chips, edit & resend, voice mode",
+                                   "PDF→Word, searchable scans, form filling, PDF compare, photo restore"]},
+    {"v": "2026.10.17", "items": ["Web + Reddit search with citations", "Photo-real text editing and magic eraser"]},
+]
 
 # Keys are NOT stored in this file (it lives on GitHub). Meow reads them from environment variables (set by the
 # launcher cell) or from Kaggle → Add-ons → Secrets, using exactly these names.
@@ -4225,6 +4236,14 @@ button{font-family:inherit}
 .cl-item .del{opacity:0;display:flex;padding:3px;border-radius:6px;color:var(--muted);background:none;border:0;cursor:pointer}
 .cl-item:hover .del{opacity:1}.cl-item .del:hover{color:var(--bad)}
 .sb-bottom{padding:10px 14px 14px;border-top:1px solid var(--line)}
+.sb-link .ver{margin-left:auto;font-size:.66rem;color:var(--dim);font-family:'JetBrains Mono',monospace}
+.sb-link.power:hover{color:#fca5a5;background:rgba(248,113,113,.08)}
+.news-ov{position:fixed;inset:0;z-index:75;background:rgba(3,3,10,.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:18px}
+.news-card{width:min(560px,100%);max-height:80vh;overflow:auto;border-radius:20px;padding:22px 24px}
+.news-card h3{margin:0 0 14px;font-family:'Space Grotesk',Inter,sans-serif;display:flex;align-items:center;gap:10px}
+.news-card h4{margin:16px 0 6px;font-size:.82rem;color:#c4b5fd;font-family:'JetBrains Mono',monospace}.news-card h4.cur::after{content:' · current';color:#86efac}
+.news-card ul{margin:0;padding-left:20px;color:#d6d8ee;font-size:.9rem;line-height:1.6}
+.news-card .x{margin-left:auto;background:none;border:0;color:var(--muted);cursor:pointer;display:flex}
 .sb-link{width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;background:none;border:0;color:var(--muted);cursor:pointer;font-size:.86rem}
 .sb-link:hover{background:rgba(255,255,255,.05);color:var(--text)}
 .health{display:flex;align-items:center;gap:8px;font-size:.74rem;color:var(--dim);padding:8px 10px 0}
@@ -4504,6 +4523,8 @@ select.inp option{background:#151733}
     <div class="chat-list" id="chatList"></div>
     <div class="sb-bottom">
       <button class="sb-link" id="sbTools"><i data-i="wrench" data-s="16"></i>File tools &amp; library</button>
+      <button class="sb-link" id="sbNews"><i data-i="sparkle" data-s="16"></i>What's new<span class="ver" id="verTag"></span></button>
+      <button class="sb-link power" id="sbPower"><i data-i="power" data-s="16"></i>Power off Meow</button>
       <div class="health"><span class="dot" id="hdot"></span><span id="healthText">Connecting to Kaggle…</span></div>
     </div>
   </aside>
@@ -4767,7 +4788,7 @@ const ICONS = {
   image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
   table:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
   code:'<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>', folder:'<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>',
-  check:'<path d="M20 6 9 17l-5-5"/>', camera:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>', waves:'<path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/>', terminal:'<path d="m4 17 6-6-6-6M12 19h8"/>', code:'<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>', chev:'<path d="m6 9 6 6 6-6"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>', power:'<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/>', camera:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>', waves:'<path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/>', terminal:'<path d="m4 17 6-6-6-6M12 19h8"/>', code:'<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>', chev:'<path d="m6 9 6 6 6-6"/>',
   sparkles:'<path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/><path d="M19 17v4M17 19h4"/>',
   eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   share:'<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/>',
@@ -4834,6 +4855,7 @@ async function copyText(t) { try { await navigator.clipboard.writeText(t); } cat
 function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
 async function api(path, body) {
   const r = await fetch(path, {method: 'POST', headers: {...HDR, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  if (r.status === 401) { location.href = '/login'; throw new Error('Login required'); }
   if (!r.ok) { let t = ''; try { t = (await r.json()).detail; } catch {} throw new Error(t || 'HTTP ' + r.status); }
   return r.json();
 }
@@ -5499,6 +5521,23 @@ $('#toolResult').addEventListener('click', e => {
   const z = e.target.closest('[data-zoom]'); if (z) openLightbox(z.dataset.zoom);
 });
 
+/* ---------------- what's new + power ---------------- */
+let META = {};
+function showNews() {
+  const log = META.changelog || []; if (!log.length) return toast('No release notes yet');
+  let ov = $('#newsOv');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'newsOv'; ov.className = 'news-ov'; document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('.x')) ov.remove(); }); }
+  ov.innerHTML = `<div class="news-card glass"><h3>🐈 What's new in Meow<button class="x" title="Close">${ic('x', 18)}</button></h3>${log.map((r, i) =>
+    `<h4 class="${i === 0 ? 'cur' : ''}">v${esc(r.v)}</h4><ul>${r.items.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</div>`;
+}
+$('#sbNews').onclick = showNews;
+$('#sbPower').onclick = async () => {
+  if (!confirm(META.batch ? 'Power off Meow and release the Kaggle GPU? You can start it again anytime.' : 'Stop the Meow server? You can restart it by running the Kaggle cell again.')) return;
+  try { await api('/api/shutdown', {}); } catch {}
+  document.body.insertAdjacentHTML('beforeend', '<div class="news-ov"><div class="news-card glass" style="text-align:center"><h3 style="justify-content:center">⏻ Meow is powering off</h3><p style="color:#9a9cc0">GPU released. Start it again with your Start Meow button or the Kaggle cell.</p></div></div>');
+};
+
 /* ---------------- health ---------------- */
 async function health() {
   try {
@@ -5506,6 +5545,8 @@ async function health() {
     $('#hdot').className = 'dot ok';
     $('#healthText').textContent = `Online · ${Math.round(j.ctx / 1024)}k context`;
     $('#modelBadge').textContent = `${j.model_short} · Kaggle GPU`;
+    META = j; $('#verTag').textContent = 'v' + (j.version || '');
+    try { const seen = localStorage.getItem('meow_seen_ver'); if (seen && seen !== j.version) { showNews(); } localStorage.setItem('meow_seen_ver', j.version); } catch {}
   } catch { $('#hdot').className = 'dot bad'; $('#healthText').textContent = 'Offline — is the Kaggle cell running?'; }
 }
 
@@ -6268,6 +6309,79 @@ def sse(obj):
 app = FastAPI(title="Meow")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# ---------- password gate, activity tracking, power-off ----------
+import hashlib, hmac
+from fastapi import Request
+from fastapi.responses import JSONResponse, RedirectResponse
+MEOW_PASSWORD = os.environ.get("MEOW_PASSWORD", "")
+STATE = {"last": time.time(), "started": time.time(), "shutdown": False}
+BATCH = os.environ.get("MEOW_BATCH") == "1"
+
+
+def _auth_token():
+    return hashlib.sha256(("meow-auth:" + MEOW_PASSWORD).encode()).hexdigest()[:40]
+
+
+LOGIN_HTML = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Meow · sign in</title><style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at top,#1e1240,#05050d 70%);
+font-family:Inter,system-ui,sans-serif;color:#e8e8f5}form{width:min(340px,88vw);padding:30px 26px;border-radius:22px;background:rgba(255,255,255,.05);
+border:1px solid rgba(167,139,250,.25);text-align:center;box-shadow:0 30px 80px -20px rgba(124,58,237,.45)}h1{margin:6px 0 4px;font-size:1.6rem}
+p{margin:0 0 20px;color:#9a9cc0;font-size:.9rem}input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.15);
+background:rgba(0,0,0,.35);color:#fff;font-size:1rem;outline:none}input:focus{border-color:#a78bfa}button{margin-top:14px;width:100%;padding:12px;border:0;
+border-radius:12px;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;font-size:1rem;font-weight:600;cursor:pointer}.err{color:#fca5a5;font-size:.85rem;margin-top:10px}
+</style></head><body><form method="post" action="/login"><div style="font-size:2.6rem">🐈</div><h1>Meow</h1><p>Enter your password</p>
+<input type="password" name="password" autofocus autocomplete="current-password"><button>Open Meow</button>__ERR__</form></body></html>"""
+
+
+@app.middleware("http")
+async def _gate(request: Request, call_next):
+    path = request.url.path
+    if path != "/api/health": STATE["last"] = time.time()
+    if MEOW_PASSWORD and path not in ("/login", "/api/health", "/favicon.ico"):
+        if not hmac.compare_digest(request.cookies.get("meow_auth", ""), _auth_token()):
+            if path.startswith("/api/"): return JSONResponse({"detail": "Login required — reload the page"}, status_code=401)
+            return RedirectResponse("/login", status_code=303)
+    return await call_next(request)
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    return HTMLResponse(LOGIN_HTML.replace("__ERR__", ""))
+
+
+@app.post("/login")
+async def login(request: Request):
+    form = await request.form()
+    if MEOW_PASSWORD and hmac.compare_digest(str(form.get("password", "")), MEOW_PASSWORD):
+        r = RedirectResponse("/", status_code=303)
+        https = request.headers.get("x-forwarded-proto", "") == "https" or request.url.scheme == "https"
+        r.set_cookie("meow_auth", _auth_token(), max_age=30 * 86400, httponly=True, samesite="lax", secure=https)
+        return r
+    time.sleep(1.2)                                        # slow down guessing
+    return HTMLResponse(LOGIN_HTML.replace("__ERR__", '<div class="err">Wrong password</div>'), status_code=401)
+
+
+@app.post("/api/shutdown")
+def shutdown():
+    STATE["shutdown"] = True
+    if not BATCH and globals().get("MEOW_SERVER") is not None:
+        threading.Timer(1.0, lambda: setattr(MEOW_SERVER, "should_exit", True)).start()
+    return {"ok": True, "batch": BATCH}
+
+
+def announce(msg, url=None):
+    """Push a phone/desktop notification through ntfy.sh (topic = MEOW_NTFY_TOPIC). Tap it to open Meow."""
+    topic = os.environ.get("MEOW_NTFY_TOPIC", "").strip()
+    if not topic: return
+    try:
+        import requests
+        h = {"Title": "Meow", "Tags": "cat", "Priority": "high" if url else "default"}
+        if url: h["Click"] = url; h["Actions"] = f"view, Open Meow, {url}"
+        requests.post(f"https://ntfy.sh/{topic}", data=msg.encode("utf-8"), headers=h, timeout=10)
+    except Exception as e:
+        print("⚠️  notification failed:", e)
+
 
 class ChatReq(BaseModel):
     prompt: str = ""
@@ -6294,7 +6408,8 @@ def index():
 
 @app.get("/api/health")
 def health():
-    return {"status": "online", "version": MEOW_VERSION, "model": GGUF_FILENAME, "model_short": MODEL_LABEL, "ctx": CTX,
+    return {"status": "online", "version": MEOW_VERSION, "batch": BATCH, "auth": bool(MEOW_PASSWORD),
+            "changelog": MEOW_CHANGELOG[:8], "model": GGUF_FILENAME, "model_short": MODEL_LABEL, "ctx": CTX,
             "chatml": USE_CHATML, "files": len(FILES), **FEATURES}
 
 
@@ -6630,3 +6745,24 @@ if __name__ == "__main__":
     print(f"🌌  Open: {public_url}")
     print(f"🧠  Model: {MODEL_LABEL} · context {CTX:,} tokens · {'ChatML' if USE_CHATML else 'chat template'}")
     print("=" * 66)
+    print(f"MEOW_URL {public_url}", flush=True)                 # machine-readable line for start_meow.py
+    STATE["last"] = time.time()
+    announce(f"Meow v{MEOW_VERSION} is live 🐈 — tap to open" + (" (password protected)" if MEOW_PASSWORD else ""), public_url)
+
+    if BATCH:                                                # started remotely (start_meow.py / GitHub button)
+        _idle = float(os.environ.get("MEOW_IDLE_MIN", "40")) * 60
+        _maxh = float(os.environ.get("MEOW_MAX_HOURS", "8")) * 3600
+        print(f"🕒  Auto power-off after {_idle / 60:.0f} min without use (max {_maxh / 3600:.0f} h) to save GPU hours.", flush=True)
+        while True:
+            time.sleep(15)
+            _now = time.time()
+            _why = ("you pressed Power off" if STATE["shutdown"] else
+                    f"no use for {_idle / 60:.0f} min" if _now - STATE["last"] > _idle and not LLM_LOCK.locked() else
+                    "time limit reached" if _now - STATE["started"] > _maxh else None)
+            if _why:
+                print(f"⏻  Shutting down: {_why}", flush=True)
+                announce(f"Meow is off ({_why}). GPU released — start it again anytime.")
+                MEOW_SERVER.should_exit = True; time.sleep(3)
+                try: ngrok.kill()
+                except Exception: pass
+                break

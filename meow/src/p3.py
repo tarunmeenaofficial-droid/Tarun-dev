@@ -171,6 +171,79 @@ def sse(obj):
 app = FastAPI(title="Meow")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# ---------- password gate, activity tracking, power-off ----------
+import hashlib, hmac
+from fastapi import Request
+from fastapi.responses import JSONResponse, RedirectResponse
+MEOW_PASSWORD = os.environ.get("MEOW_PASSWORD", "")
+STATE = {"last": time.time(), "started": time.time(), "shutdown": False}
+BATCH = os.environ.get("MEOW_BATCH") == "1"
+
+
+def _auth_token():
+    return hashlib.sha256(("meow-auth:" + MEOW_PASSWORD).encode()).hexdigest()[:40]
+
+
+LOGIN_HTML = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Meow · sign in</title><style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at top,#1e1240,#05050d 70%);
+font-family:Inter,system-ui,sans-serif;color:#e8e8f5}form{width:min(340px,88vw);padding:30px 26px;border-radius:22px;background:rgba(255,255,255,.05);
+border:1px solid rgba(167,139,250,.25);text-align:center;box-shadow:0 30px 80px -20px rgba(124,58,237,.45)}h1{margin:6px 0 4px;font-size:1.6rem}
+p{margin:0 0 20px;color:#9a9cc0;font-size:.9rem}input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.15);
+background:rgba(0,0,0,.35);color:#fff;font-size:1rem;outline:none}input:focus{border-color:#a78bfa}button{margin-top:14px;width:100%;padding:12px;border:0;
+border-radius:12px;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;font-size:1rem;font-weight:600;cursor:pointer}.err{color:#fca5a5;font-size:.85rem;margin-top:10px}
+</style></head><body><form method="post" action="/login"><div style="font-size:2.6rem">🐈</div><h1>Meow</h1><p>Enter your password</p>
+<input type="password" name="password" autofocus autocomplete="current-password"><button>Open Meow</button>__ERR__</form></body></html>"""
+
+
+@app.middleware("http")
+async def _gate(request: Request, call_next):
+    path = request.url.path
+    if path != "/api/health": STATE["last"] = time.time()
+    if MEOW_PASSWORD and path not in ("/login", "/api/health", "/favicon.ico"):
+        if not hmac.compare_digest(request.cookies.get("meow_auth", ""), _auth_token()):
+            if path.startswith("/api/"): return JSONResponse({"detail": "Login required — reload the page"}, status_code=401)
+            return RedirectResponse("/login", status_code=303)
+    return await call_next(request)
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    return HTMLResponse(LOGIN_HTML.replace("__ERR__", ""))
+
+
+@app.post("/login")
+async def login(request: Request):
+    form = await request.form()
+    if MEOW_PASSWORD and hmac.compare_digest(str(form.get("password", "")), MEOW_PASSWORD):
+        r = RedirectResponse("/", status_code=303)
+        https = request.headers.get("x-forwarded-proto", "") == "https" or request.url.scheme == "https"
+        r.set_cookie("meow_auth", _auth_token(), max_age=30 * 86400, httponly=True, samesite="lax", secure=https)
+        return r
+    time.sleep(1.2)                                        # slow down guessing
+    return HTMLResponse(LOGIN_HTML.replace("__ERR__", '<div class="err">Wrong password</div>'), status_code=401)
+
+
+@app.post("/api/shutdown")
+def shutdown():
+    STATE["shutdown"] = True
+    if not BATCH and globals().get("MEOW_SERVER") is not None:
+        threading.Timer(1.0, lambda: setattr(MEOW_SERVER, "should_exit", True)).start()
+    return {"ok": True, "batch": BATCH}
+
+
+def announce(msg, url=None):
+    """Push a phone/desktop notification through ntfy.sh (topic = MEOW_NTFY_TOPIC). Tap it to open Meow."""
+    topic = os.environ.get("MEOW_NTFY_TOPIC", "").strip()
+    if not topic: return
+    try:
+        import requests
+        h = {"Title": "Meow", "Tags": "cat", "Priority": "high" if url else "default"}
+        if url: h["Click"] = url; h["Actions"] = f"view, Open Meow, {url}"
+        requests.post(f"https://ntfy.sh/{topic}", data=msg.encode("utf-8"), headers=h, timeout=10)
+    except Exception as e:
+        print("⚠️  notification failed:", e)
+
 
 class ChatReq(BaseModel):
     prompt: str = ""
@@ -197,7 +270,8 @@ def index():
 
 @app.get("/api/health")
 def health():
-    return {"status": "online", "version": MEOW_VERSION, "model": GGUF_FILENAME, "model_short": MODEL_LABEL, "ctx": CTX,
+    return {"status": "online", "version": MEOW_VERSION, "batch": BATCH, "auth": bool(MEOW_PASSWORD),
+            "changelog": MEOW_CHANGELOG[:8], "model": GGUF_FILENAME, "model_short": MODEL_LABEL, "ctx": CTX,
             "chatml": USE_CHATML, "files": len(FILES), **FEATURES}
 
 
@@ -418,3 +492,24 @@ if __name__ == "__main__":
     print(f"🌌  Open: {public_url}")
     print(f"🧠  Model: {MODEL_LABEL} · context {CTX:,} tokens · {'ChatML' if USE_CHATML else 'chat template'}")
     print("=" * 66)
+    print(f"MEOW_URL {public_url}", flush=True)                 # machine-readable line for start_meow.py
+    STATE["last"] = time.time()
+    announce(f"Meow v{MEOW_VERSION} is live 🐈 — tap to open" + (" (password protected)" if MEOW_PASSWORD else ""), public_url)
+
+    if BATCH:                                                # started remotely (start_meow.py / GitHub button)
+        _idle = float(os.environ.get("MEOW_IDLE_MIN", "40")) * 60
+        _maxh = float(os.environ.get("MEOW_MAX_HOURS", "8")) * 3600
+        print(f"🕒  Auto power-off after {_idle / 60:.0f} min without use (max {_maxh / 3600:.0f} h) to save GPU hours.", flush=True)
+        while True:
+            time.sleep(15)
+            _now = time.time()
+            _why = ("you pressed Power off" if STATE["shutdown"] else
+                    f"no use for {_idle / 60:.0f} min" if _now - STATE["last"] > _idle and not LLM_LOCK.locked() else
+                    "time limit reached" if _now - STATE["started"] > _maxh else None)
+            if _why:
+                print(f"⏻  Shutting down: {_why}", flush=True)
+                announce(f"Meow is off ({_why}). GPU released — start it again anytime.")
+                MEOW_SERVER.should_exit = True; time.sleep(3)
+                try: ngrok.kill()
+                except Exception: pass
+                break

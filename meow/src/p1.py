@@ -39,7 +39,18 @@ MAX_NEW_FAST = 2048
 MAX_NEW_THINK = 6144
 ENABLE_CAPTIONS = os.environ.get('MEOW_CAPTIONS','1')=='1'    # BLIP image captions on CPU (one-time ~1.9 GB download)
 PORT = 8000
-MEOW_VERSION = "2026.10.19"
+MEOW_VERSION = "2026.10.19.2"
+MEOW_CHANGELOG = [   # newest first — shown in the app under "What's new"
+    {"v": "2026.10.19.2", "items": ["Start Meow from anywhere with one click (Kaggle API) and get a phone notification with the link",
+                                     "Password protection", "Auto power-off when idle to save GPU hours", "What's new panel"]},
+    {"v": "2026.10.19", "items": ["One-cell Kaggle launcher with automatic updates from GitHub", "Sharper OCR spacing for IDs"]},
+    {"v": "2026.10.18", "items": ["Reddit/Deep research keeps searching until your question is answered (up to 3 rounds)",
+                                   "Comments ranked by relevance; promo/scam comments filtered", "Python code interpreter with charts",
+                                   "YouTube, Wikipedia, papers, GitHub, Stack Overflow, Hacker News sources; reads pasted links",
+                                   "Mermaid diagrams, HTML preview, follow-up chips, edit & resend, voice mode",
+                                   "PDF→Word, searchable scans, form filling, PDF compare, photo restore"]},
+    {"v": "2026.10.17", "items": ["Web + Reddit search with citations", "Photo-real text editing and magic eraser"]},
+]
 
 # Keys are NOT stored in this file (it lives on GitHub). Meow reads them from environment variables (set by the
 # launcher cell) or from Kaggle → Add-ons → Secrets, using exactly these names.
