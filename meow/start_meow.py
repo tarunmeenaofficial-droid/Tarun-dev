@@ -3,16 +3,17 @@
 🐈 Start Meow with one click — no Kaggle tab needed.
 
     python start_meow.py            start Meow on a Kaggle GPU and open it in your browser
-    python start_meow.py setup      one-time: cache the model + GPU engine on Kaggle (makes every start ~5× faster)
     python start_meow.py status     is Meow running?
     python start_meow.py logs       show the Kaggle log
+    python start_meow.py stop       stop Meow now (frees the GPU)
+    python start_meow.py reset      delete Meow's Kaggle notebooks to start completely fresh
 
 The first run asks for your keys and saves them in meow_config.json NEXT TO THIS FILE (keep that file private).
 It uses the Kaggle API to start a private notebook with a GPU T4×2, waits for the public link, opens it and sends a
 notification to your phone (ntfy app). Meow powers itself off after a while without use, so GPU hours aren't wasted.
 In GitHub Actions the same script reads everything from environment variables (repo secrets) instead.
 """
-import json, os, re, secrets, subprocess, sys, tempfile, time, urllib.request, webbrowser
+import json, os, re, secrets, subprocess, sys, tempfile, time, urllib.parse, urllib.request, webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CFG_PATH = os.path.join(HERE, "meow_config.json")
@@ -105,6 +106,37 @@ def meta_for(user, slug, title, sources=()):
             "kernel_sources": list(sources)}
 
 
+def reset(cfg, api):
+    """Delete Meow's Kaggle notebooks (and with them any queued/cancelling runs) for a clean start."""
+    user = cfg["kaggle_username"]
+    for slug in (SERVER_SLUG, CACHE_SLUG):
+        try:
+            api.kernels_delete(f"{user}/{slug}", no_confirm=True); say(f"🗑️  deleted {user}/{slug}")
+        except Exception as e:
+            msg = str(e)
+            say(f"   {user}/{slug}: " + ("not there — nothing to delete" if "404" in msg or "not found" in msg.lower() else msg[:160]))
+    say("✅ Kaggle is clean. Double-click Start Meow.bat to start fresh.")
+
+
+def stop(cfg, api):
+    """Ask a running Meow to power off (via its own Power-off endpoint) — works while the page is open or not."""
+    user = cfg["kaggle_username"]; sid = f"{user}/{SERVER_SLUG}"
+    try:
+        log = api.kernels_logs(sid); urls = re.findall(r"MEOW_URL (https://\S+)", log)
+    except Exception:
+        urls = []
+    if not urls: return say("Meow doesn't seem to be running (no link found). Status:", status(api, sid))
+    try:
+        req = urllib.request.Request(urls[-1].rstrip("/") + "/login", data=urllib.parse.urlencode({"password": cfg.get("MEOW_PASSWORD", "")}).encode())
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+        opener.addheaders = [("ngrok-skip-browser-warning", "1")]
+        if cfg.get("MEOW_PASSWORD"): opener.open(req, timeout=20)
+        opener.open(urllib.request.Request(urls[-1].rstrip("/") + "/api/shutdown", data=b"{}", headers={"Content-Type": "application/json"}), timeout=20)
+        say("⏻ Meow is powering off — the GPU is released in about a minute.")
+    except Exception as e:
+        say("Couldn't reach Meow to stop it:", str(e)[:120], "— it will still power off by itself when idle.")
+
+
 def setup(cfg, api):
     user = cfg["kaggle_username"]
     say("📦 Starting the one-time cache job on Kaggle: it downloads the model (~15 GB) and prepares the GPU engine,")
@@ -122,8 +154,7 @@ def start(cfg, api, open_browser=True):
     if st in ("running", "queued"):
         say(f"ℹ️  Meow is already {st}. Looking for its link…")
     else:
-        cache_ok = status(api, f"{user}/{CACHE_SLUG}") == "complete"
-        if not cache_ok: say("💡 Tip: run `python start_meow.py setup` once — starts become much faster.")
+        cache_ok = False   # downloading the model on Kaggle takes ~1 min — faster and simpler than a 15 GB saved output
         keys = {k: cfg.get(k, "") for k in ("NGROK_AUTH_TOKEN", "SERPER_API_KEY", "TAVILY_API_KEY")}
         extra = {"MEOW_BATCH": "1", "MEOW_PASSWORD": cfg.get("MEOW_PASSWORD", ""), "MEOW_NTFY_TOPIC": cfg["ntfy_topic"],
                  "MEOW_IDLE_MIN": str(cfg["idle_minutes"]), "MEOW_MAX_HOURS": str(cfg["max_hours"])}
@@ -167,6 +198,8 @@ def wait_for_url(api, sid, topic, limit=60 * 45):
         except Exception:
             pass
         st = status(api, sid)
+        if st == "queued" and last_stage != "queued":
+            last_stage = "queued"; say("   ⏳ Kaggle is finding a free GPU T4×2 (queued) — this can take a few minutes at busy times…")
         if st in ("error", "cancelacknowledged", "cancelrequested", "complete"):
             say(f"⚠️  The Kaggle run ended with status: {st}"); return None
         time.sleep(15)
@@ -177,7 +210,11 @@ def main():
     cmd = (sys.argv[1] if len(sys.argv) > 1 else "start").lower()
     cfg = load_cfg(); api = kaggle_api(cfg)
     user = cfg["kaggle_username"]
-    if cmd == "setup": setup(cfg, api)
+    if cmd == "setup":
+        say("ℹ️  Setup isn't needed anymore — each start downloads the model on Kaggle in about a minute.")
+        say("   Just double-click Start Meow.bat. (Use `python start_meow.py reset` to clear old Kaggle runs.)")
+    elif cmd == "reset": reset(cfg, api)
+    elif cmd == "stop": stop(cfg, api)
     elif cmd == "status":
         say("Meow server:", status(api, f"{user}/{SERVER_SLUG}"), "| cache:", status(api, f"{user}/{CACHE_SLUG}"))
     elif cmd == "logs":

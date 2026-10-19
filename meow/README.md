@@ -20,14 +20,13 @@ Meow starts on a Kaggle GPU through the Kaggle API, sends a notification to your
    - a password for Meow
 
    These are saved in `meow_config.json` next to the script. That file is private: never upload it.
-3. One time only, run `python start_meow.py setup`. This caches the model and the GPU engine on Kaggle, so later starts take ~2–4 min instead of ~10.
-4. From then on, double-click **Start Meow.bat** → Meow opens in your browser when it's ready.
+3. Meow opens in your browser when it's ready, in about 5 min (Kaggle downloads the model in about a minute each time). If Kaggle is busy, it may queue for a few minutes first.
 
 **On your phone:**
 - Install the **ntfy** app and subscribe to the topic shown by the script (`meow-…`). You get a notification with an *Open Meow* button every time it starts.
 - To start Meow from the phone, use the GitHub button: copy [`github/meow.yml`](github/meow.yml) to `.github/workflows/` on the `main` branch, then add the repo secrets listed at the top of that file. After that: GitHub app → Actions → **Meow** → *Run workflow*.
 
-**Commands:** `python start_meow.py` (start) · `setup` · `status` · `logs`. In the app, **Power off Meow** in the sidebar releases the GPU right away.
+**Commands:** `python start_meow.py` (start) · `status` · `logs` · `stop` · `reset` (deletes Meow's Kaggle notebooks for a completely fresh start). In the app, **Power off Meow** in the sidebar releases the GPU right away.
 
 ## Run it on Kaggle (one cell)
 
