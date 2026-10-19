@@ -1,0 +1,131 @@
+<style>
+.pe{position:fixed;inset:0;z-index:65;display:flex;flex-direction:column;background:rgba(6,7,18,.97);backdrop-filter:blur(10px)}
+.pe-top{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;background:rgba(12,13,30,.9)}
+.pe-title{display:flex;align-items:center;gap:8px;min-width:0;max-width:240px}
+.pe-title .cat-slot{width:26px;height:26px;flex-shrink:0}
+.pe-title #peName{font-weight:600;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pe-status{font-size:.72rem;color:var(--dim);white-space:nowrap}
+.pe-group{display:flex;align-items:center;gap:2px;padding:3px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.pe-group button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;min-width:34px;padding:0 9px;border-radius:9px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:.78rem;white-space:nowrap}
+.pe-group button:hover{background:rgba(255,255,255,.07);color:var(--text)}
+.pe-group button.on{background:linear-gradient(135deg,rgba(139,92,246,.45),rgba(59,130,246,.3));color:#fff}
+.pe-group button:disabled{opacity:.35;cursor:default}
+.pe-group .lbl{display:none}
+@media (min-width:1600px){.pe-tools .lbl{display:inline}}
+.pe-props input[type=color]{width:30px;height:30px;border:0;background:none;padding:0;cursor:pointer}
+.pe-props select,.pe-props input[type=number]{height:30px;border-radius:8px;border:1px solid var(--line2);background:rgba(255,255,255,.05);color:var(--text);font:inherit;font-size:.78rem;padding:0 6px}
+.pe-props input[type=number]{width:54px}
+.pe-props button{font-weight:700;font-family:Georgia,serif}
+.pe-sp{flex:1}
+.pe-save{height:36px;display:inline-flex;align-items:center;gap:7px;padding:0 16px;border-radius:999px;border:0;cursor:pointer;color:#fff;font-weight:600;font-size:.84rem;background:linear-gradient(135deg,#8b5cf6,#3b82f6);box-shadow:0 6px 18px -6px rgba(139,92,246,.7)}
+.pe-body{flex:1;display:flex;min-height:0}
+.pe-thumbs{width:150px;flex-shrink:0;overflow-y:auto;padding:12px 10px;border-right:1px solid var(--line)}
+.pe-th{position:relative;margin-bottom:14px;cursor:pointer}
+.pe-th img{width:100%;display:block;border-radius:6px;background:#fff;border:2px solid transparent;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.pe-th.on img{border-color:#8b5cf6}
+.pe-th .no{text-align:center;font-size:.7rem;color:var(--muted);margin-top:4px}
+.pe-th .ops{position:absolute;top:4px;right:4px;display:none;flex-direction:column;gap:3px}
+.pe-th:hover .ops{display:flex}
+.pe-th .ops button{width:24px;height:24px;border-radius:7px;border:0;background:rgba(10,10,25,.85);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.pe-th .ops button:hover{background:#8b5cf6}
+.pe-addpage{width:100%;padding:9px;border-radius:10px;border:1px dashed var(--line2);background:none;color:var(--muted);font-size:.76rem;cursor:pointer}
+.pe-addpage:hover{color:var(--text);border-color:#8b5cf6}
+.pe-stage{flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:28px}
+.pe-page{position:relative;flex-shrink:0;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.6);user-select:none}
+.pe-page img{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.pe-page canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.pe-ov{position:absolute;inset:0;touch-action:none}
+.pe-ov[data-tool=addtext]{cursor:text}.pe-ov[data-tool=draw]{cursor:crosshair}.pe-ov[data-tool=highlight],.pe-ov[data-tool=shape],.pe-ov[data-tool=erase],.pe-ov[data-tool=magic]{cursor:crosshair}.pe-ov[data-tool=place]{cursor:copy}
+.pe-run{position:absolute;border-radius:2px;cursor:text}
+.pe-ov[data-tool=select] .pe-run:hover,.pe-ov[data-tool=text] .pe-run:hover{outline:1.5px dashed rgba(124,58,237,.8);background:rgba(167,139,250,.12)}
+.pe-ov[data-tool=text] .pe-run{outline:1px dashed rgba(124,58,237,.28)}
+.pe-run.scan{outline:1px dashed rgba(245,158,11,.55)}
+.pe-ov[data-tool=select] .pe-run.scan:hover,.pe-ov[data-tool=text] .pe-run.scan:hover{outline:1.5px dashed #f59e0b;background:rgba(245,158,11,.12)}
+.pe-run.sel{outline:2px solid #8b5cf6!important;background:rgba(167,139,250,.15)}
+.pe-img{position:absolute;cursor:move}
+.pe-ov[data-tool=select] .pe-img:hover{outline:1.5px dashed rgba(59,130,246,.9)}
+.pe-img.sel{outline:2px solid #3b82f6}
+.pe-img .h{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;background:#3b82f6;border:2px solid #fff;border-radius:4px;cursor:nwse-resize;display:none}
+.pe-img.sel .h{display:block}
+.pe-ov:not([data-tool=select]):not([data-tool=text]) .pe-run,.pe-ov:not([data-tool=select]) .pe-img{pointer-events:none}
+.pe-ov[data-tool=text] .pe-img{pointer-events:none}
+.pe-edit{position:absolute;outline:2px solid #8b5cf6;white-space:pre;min-width:24px;z-index:5;padding:0 1px;margin:0;border-radius:2px;cursor:text;box-shadow:0 0 0 4px rgba(139,92,246,.2)}
+.pe-rubber{position:absolute;border:1.5px dashed #8b5cf6;background:rgba(139,92,246,.1);pointer-events:none}
+.pe-ghost{position:absolute;opacity:.6;pointer-events:none;outline:1.5px dashed #8b5cf6}
+.pe-side{width:270px;flex-shrink:0;overflow-y:auto;padding:16px;border-left:1px solid var(--line);font-size:.84rem}
+.pe-side h4{margin:0 0 4px;font-family:'Space Grotesk',sans-serif;font-size:1rem}
+.pe-side .muted{color:var(--muted);font-size:.78rem;line-height:1.5}
+.pe-side .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.pe-side .btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;border-radius:10px;border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--text);cursor:pointer;font-size:.76rem}
+.pe-side .btn:hover{border-color:#8b5cf6;background:rgba(139,92,246,.14)}
+.pe-side .btn.danger:hover{border-color:var(--bad);background:rgba(248,113,113,.12)}
+.pe-side .btn.wide{grid-column:1/-1}
+.pe-side .prev{width:100%;max-height:140px;object-fit:contain;border-radius:10px;background:repeating-conic-gradient(#2a2c40 0 25%,#1d1f30 0 50%) 0/16px 16px;margin-top:10px}
+.pe-side .sec{margin-top:16px;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.pe-side kbd{font-family:inherit;font-size:.7rem;border:1px solid var(--line2);border-radius:5px;padding:0 5px;color:var(--muted)}
+.pe-side .row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.pe-side .row label{font-size:.76rem;color:var(--muted);min-width:64px}
+.pe-busy{position:absolute;right:18px;bottom:18px;display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(20,22,46,.95);border:1px solid var(--line2);font-size:.78rem;z-index:6}
+.sig-pad{width:100%;height:200px;border-radius:14px;background:#fff;touch-action:none;cursor:crosshair}
+@media (max-width:820px){.pe-thumbs{display:none}.pe-side{position:absolute;left:0;right:0;bottom:0;width:auto;max-height:42%;background:rgba(12,13,30,.97);border-left:0;border-top:1px solid var(--line);z-index:7}.pe-side.empty{display:none}.pe-stage{padding:12px}.pe-title{max-width:120px}}
+</style>
+<div class="pe hidden" id="pdfEditor">
+  <div class="pe-top">
+    <div class="pe-title"><span class="cat-slot"></span><span id="peName">document.pdf</span><span class="pe-status" id="peStatus"></span></div>
+    <div class="pe-group pe-tools" id="peTools">
+      <button data-tool="select" title="Select & move (V)"><i data-i="cursor" data-s="16"></i><span class="lbl">Select</span></button>
+      <button data-tool="text" title="Edit text (E)"><i data-i="type" data-s="16"></i><span class="lbl">Edit text</span></button>
+      <button data-tool="addtext" title="Add text (T)"><i data-i="typeplus" data-s="16"></i><span class="lbl">Add text</span></button>
+      <button data-tool="image" title="Add image (I)"><i data-i="image" data-s="16"></i><span class="lbl">Image</span></button>
+      <button data-tool="draw" title="Draw (D)"><i data-i="pen" data-s="16"></i><span class="lbl">Draw</span></button>
+      <button data-tool="highlight" title="Highlight (H)"><i data-i="marker" data-s="16"></i><span class="lbl">Highlight</span></button>
+      <button data-tool="shape" title="Shapes (R)"><i data-i="square" data-s="16"></i><span class="lbl">Shape</span></button>
+      <button data-tool="erase" title="Erase area (X)"><i data-i="eraser" data-s="16"></i><span class="lbl">Erase</span></button>
+      <button data-tool="magic" title="Magic eraser (M)"><i data-i="wand" data-s="16"></i><span class="lbl">Magic</span></button>
+      <button data-tool="sign" title="Signature (S)"><i data-i="sign" data-s="16"></i><span class="lbl">Sign</span></button>
+    </div>
+    <div class="pe-group pe-props" title="Style for new text, drawing and edits">
+      <input type="color" id="peColor" value="#111111" title="Colour">
+      <select id="peFamily" title="Font"><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option></select>
+      <input type="number" id="peSize" value="12" min="4" max="200" step="0.5" title="Size (pt)">
+      <button id="peBold" title="Bold">B</button><button id="peItalic" title="Italic"><i style="font-family:Georgia,serif">I</i></button>
+    </div>
+    <div class="pe-group">
+      <button id="peUndo" title="Undo (Ctrl+Z)"><i data-i="undo" data-s="16"></i></button>
+      <button id="peRedo" title="Redo (Ctrl+Y)"><i data-i="redo" data-s="16"></i></button>
+    </div>
+    <div class="pe-group">
+      <button id="peZoomOut" title="Zoom out"><i data-i="zout" data-s="16"></i></button>
+      <button id="peZoom" title="Fit width" style="min-width:52px">100%</button>
+      <button id="peZoomIn" title="Zoom in"><i data-i="zin" data-s="16"></i></button>
+    </div>
+    <span class="pe-sp"></span>
+    <div class="pe-group"><button id="peDownload" title="Download PDF"><i data-i="download" data-s="16"></i></button></div>
+    <button class="pe-save" id="peSave"><i data-i="check" data-s="16"></i>Save</button>
+    <button class="icon-btn" id="peClose" title="Close (Esc)"><i data-i="x"></i></button>
+  </div>
+  <div class="pe-body">
+    <div class="pe-thumbs" id="peThumbs"></div>
+    <div class="pe-stage" id="peStage">
+      <div class="pe-page" id="pePage"><img id="peImg" alt=""><canvas id="peInk"></canvas><div class="pe-ov" id="peOv" data-tool="select"></div></div>
+    </div>
+    <div class="pe-side" id="peSide"></div>
+  </div>
+  <div class="pe-busy hidden" id="peBusy"><span class="spin" style="width:16px;height:16px"></span><span id="peBusyText">Applying…</span></div>
+</div>
+<input type="file" id="peFile" accept="image/*,.heic,.heif" hidden>
+<div class="modal hidden" id="signModal" style="z-index:70">
+  <div class="modal-card" style="height:auto;width:min(560px,100%)">
+    <div class="modal-head"><i data-i="sign" data-s="17"></i><span>Draw your signature</span><span class="sp"></span><button class="icon-btn" id="signClose"><i data-i="x"></i></button></div>
+    <div style="padding:18px">
+      <canvas class="sig-pad" id="sigPad"></canvas>
+      <div style="display:flex;gap:10px;margin-top:14px;align-items:center">
+        <input type="color" id="sigColor" value="#0b1f6b" style="width:34px;height:34px;border:0;background:none">
+        <button class="small-btn" id="sigClear">Clear</button>
+        <button class="small-btn" id="sigUpload">Upload image instead</button>
+        <span class="pe-sp"></span>
+        <button class="pe-save" id="sigUse">Place signature</button>
+      </div>
+    </div>
+  </div>
+</div>

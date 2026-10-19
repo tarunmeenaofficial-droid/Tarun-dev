@@ -1,0 +1,835 @@
+<script>
+(() => {
+'use strict';
+const USER_NAME = '__USER_NAME__';
+const HDR = {'ngrok-skip-browser-warning': '1'};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const uid = () => Math.random().toString(36).slice(2, 10);
+const isTouch = matchMedia('(pointer: coarse)').matches;
+
+/* ---------------- icons ---------------- */
+const ICONS = {
+  plus:'<path d="M12 5v14M5 12h14"/>', x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>', stop:'<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>',
+  mic:'<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10a7 7 0 0 1-14 0M12 17v5M8 22h8"/>',
+  clip:'<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+  brain:'<path d="M9.5 2A2.5 2.5 0 0 0 7 4.5v.5a3 3 0 0 0-3 3v1a3 3 0 0 0 0 6v1a3 3 0 0 0 3 3 2.5 2.5 0 0 0 5 0V4.5A2.5 2.5 0 0 0 9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 1 17 4.5v.5a3 3 0 0 1 3 3v1a3 3 0 0 1 0 6v1a3 3 0 0 1-3 3 2.5 2.5 0 0 1-5 0"/>',
+  copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+  refresh:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
+  volume:'<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>',
+  trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>', menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+  globe:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  globeoff:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="m4 4 16 16"/>',
+  sparkle:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z"/>',
+  reddit:'<circle cx="12" cy="14" r="7"/><circle cx="9.5" cy="13.5" r="1" fill="currentColor"/><circle cx="14.5" cy="13.5" r="1" fill="currentColor"/><path d="M9.5 16.5c1.4 1 3.6 1 5 0M12 7l1.2-4 3.8 1"/><circle cx="18" cy="4" r="1.3"/><circle cx="19.5" cy="10" r="1.6"/><circle cx="4.5" cy="10" r="1.6"/>',
+  layers:'<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
+  wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
+  image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
+  table:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
+  code:'<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>', folder:'<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>', camera:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>', waves:'<path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/>', terminal:'<path d="m4 17 6-6-6-6M12 19h8"/>', code:'<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>', chev:'<path d="m6 9 6 6 6-6"/>',
+  sparkles:'<path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/><path d="M19 17v4M17 19h4"/>',
+  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  share:'<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/>',
+  chat:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  slides:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>'
+};
+const ic = (n, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n] || ''}</svg>`;
+function hydrateIcons(root = document) { root.querySelectorAll('[data-i]').forEach(el => { el.outerHTML = ic(el.dataset.i, +el.dataset.s || 18); }); }
+
+/* ---------------- the grey cat (original mascot) ---------------- */
+const CAT_DEFS = '<defs><radialGradient id="catFur" cx="50%" cy="36%" r="68%"><stop offset="0" stop-color="#d4d8de"/><stop offset=".55" stop-color="#9ea4ad"/><stop offset="1" stop-color="#6b717a"/></radialGradient><radialGradient id="catEye" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#e2fbb0"/><stop offset="1" stop-color="#5fa317"/></radialGradient></defs>';
+const CAT = `<svg viewBox="0 0 64 64" width="100%" height="100%">
+<path d="M9 30 L11 5 L28 17 Z" fill="url(#catFur)"/><path d="M55 30 L53 5 L36 17 Z" fill="url(#catFur)"/>
+<path d="M13.5 23 L14.5 11 L23 17.5 Z" fill="#f2b8c6"/><path d="M50.5 23 L49.5 11 L41 17.5 Z" fill="#f2b8c6"/>
+<ellipse cx="32" cy="37" rx="24" ry="21" fill="url(#catFur)"/>
+<path d="M32 17v7M26.5 18.5l1.8 5.2M37.5 18.5l-1.8 5.2" stroke="#5f666e" stroke-width="2.2" stroke-linecap="round"/>
+<g class="cat-eyes"><ellipse cx="22.5" cy="35" rx="5.2" ry="5.8" fill="url(#catEye)"/><ellipse cx="41.5" cy="35" rx="5.2" ry="5.8" fill="url(#catEye)"/>
+<ellipse cx="22.5" cy="35.4" rx="1.7" ry="4.6" fill="#111"/><ellipse cx="41.5" cy="35.4" rx="1.7" ry="4.6" fill="#111"/>
+<circle cx="24.2" cy="32.6" r="1.3" fill="#fff"/><circle cx="43.2" cy="32.6" r="1.3" fill="#fff"/></g>
+<ellipse cx="16.5" cy="44" rx="3.5" ry="2" fill="#f2b8c6" opacity=".35"/><ellipse cx="47.5" cy="44" rx="3.5" ry="2" fill="#f2b8c6" opacity=".35"/>
+<path d="M29.4 43.2h5.2L32 46z" fill="#f2a1b5"/>
+<path d="M32 46q-1.8 3.2-5 2.2M32 46q1.8 3.2 5 2.2" stroke="#3f444a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+<path d="M19 44.5 4 42.5M19 47.5 5 50M45 44.5l15-2M45 47.5l14 2.5" stroke="#eef0f3" stroke-width="1" stroke-linecap="round" opacity=".75"/>
+</svg>`;
+document.querySelectorAll('.cat-slot').forEach(el => el.innerHTML = CAT);
+$('#favicon').href = 'data:image/svg+xml,' + encodeURIComponent(CAT.replace(/<svg[^>]*>/, m => m.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"') + CAT_DEFS));
+
+/* ---------------- state ---------------- */
+const LS = 'meow_chats_v1';
+let chats = []; try { chats = JSON.parse(localStorage.getItem(LS) || '[]'); } catch {}
+let activeId = null;
+let mode = 'fast'; try { mode = localStorage.getItem('meow_mode') || 'fast'; } catch {}
+let pending = [];
+let busy = false, abortCtl = null, currentRid = null;
+let liveEl = null, liveMsg = null, rTimer = null;
+let lib = [];
+
+function save() {
+  const clean = chats.slice().sort((a, b) => b.updated - a.updated).map(c => ({...c,
+    messages: c.messages.map(m => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith('_'))))}));
+  for (let i = 0; i < 8; i++) {
+    try { localStorage.setItem(LS, JSON.stringify(clean)); return; }
+    catch { if (clean.length > 1) clean.pop(); else return; }
+  }
+}
+const activeChat = () => chats.find(c => c.id === activeId);
+function newChat(title) { const c = {id: uid(), title: title || 'New chat', created: Date.now(), updated: Date.now(), messages: [], fileIds: []}; chats.unshift(c); return c; }
+
+/* ---------------- helpers ---------------- */
+const KIND_ICON = {pdf: 'file', image: 'image', docx: 'file', pptx: 'slides', sheet: 'table', text: 'code', zip: 'folder'};
+const EXT = {python:'py',py:'py',javascript:'js',js:'js',typescript:'ts',ts:'ts',tsx:'tsx',jsx:'jsx',html:'html',css:'css',json:'json',bash:'sh',sh:'sh',shell:'sh',zsh:'sh',powershell:'ps1',cpp:'cpp','c++':'cpp',c:'c',java:'java',kotlin:'kt',swift:'swift',go:'go',rust:'rs',ruby:'rb',php:'php',sql:'sql',yaml:'yml',yml:'yml',markdown:'md',md:'md',csv:'csv',xml:'xml',dart:'dart',r:'r',text:'txt',plaintext:'txt'};
+function guessKind(name) { const e = (name.split('.').pop() || '').toLowerCase();
+  if (e === 'pdf') return 'pdf'; if (['png','jpg','jpeg','webp','gif','bmp','tif','tiff','heic','heif'].includes(e)) return 'image';
+  if (e === 'docx') return 'docx'; if (e === 'pptx') return 'pptx'; if (['xlsx','xlsm','xls','csv','tsv'].includes(e)) return 'sheet'; if (e === 'zip') return 'zip'; return 'text'; }
+const humanSize = b => !b ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
+function metaStr(f) { const m = f.meta || {}; const p = [(f.kind || '').toUpperCase()]; if (m.pages) p.push(m.pages + (m.pages === 1 ? ' page' : ' pages')); if (m.dims) p.push(m.dims); if (f.size) p.push(humanSize(f.size)); return p.filter(Boolean).join(' · '); }
+function thumb(f) {
+  if (f.id && (f.kind === 'image' || f.kind === 'pdf')) return `<img class="th" src="/api/thumb/${f.id}?size=200" data-zoom="/api/thumb/${f.id}?size=1600" alt="" onerror="this.style.opacity=0">`;
+  if (f.previewUrl) return `<img class="th" src="${f.previewUrl}" alt="">`;
+  return `<div class="th">${ic(KIND_ICON[f.kind] || 'file', 18)}</div>`;
+}
+function toast(msg, type = '') { const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg; $('#toasts').appendChild(t); setTimeout(() => t.remove(), 3200); }
+async function copyText(t) { try { await navigator.clipboard.writeText(t); } catch { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); } }
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+async function api(path, body) {
+  const r = await fetch(path, {method: 'POST', headers: {...HDR, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  if (!r.ok) { let t = ''; try { t = (await r.json()).detail; } catch {} throw new Error(t || 'HTTP ' + r.status); }
+  return r.json();
+}
+const scroller = $('#scroller');
+const nearBottom = () => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140;
+const scrollBottom = () => { scroller.scrollTop = scroller.scrollHeight; };
+
+/* ---------------- markdown + math ---------------- */
+/* graceful fallbacks if a CDN is slow/blocked — the app still works */
+const HAS = {md: !!window.marked, pur: !!window.DOMPurify, hl: !!window.hljs, kx: !!window.katex};
+if (HAS.pur) DOMPurify.addHook('afterSanitizeAttributes', n => { if (n.tagName === 'A') { n.setAttribute('target', '_blank'); n.setAttribute('rel', 'noopener noreferrer'); } });
+if (HAS.hl) hljs.configure({ignoreUnescapedHTML: true});
+const sanitize = h => HAS.pur ? DOMPurify.sanitize(h) : h;
+const mdParse = s => HAS.md ? marked.parse(s, {gfm: true, breaks: false})
+  : esc(s).replace(/```(\w*)\n([\s\S]*?)```/g, (_, l, c) => `<pre><code class="language-${l || 'text'}">${c}</code></pre>`).replace(/\n/g, '<br>');
+function mathHTML(src) {
+  let display = false, body;
+  if (src.startsWith('$$')) { display = true; body = src.slice(2, -2); }
+  else if (src.startsWith('\\[')) { display = true; body = src.slice(2, -2); }
+  else if (src.startsWith('\\(')) body = src.slice(2, -2);
+  else body = src.slice(1, -1);
+  if (!HAS.kx) return `<code>${esc(src)}</code>`;
+  try { return katex.renderToString(body, {displayMode: display, throwOnError: false}); } catch { return esc(src); }
+}
+function splitThink(raw) {
+  const r = splitThink0(raw);
+  const m = r.answer.match(/<<\s*follow-?ups?\s*:([\s\S]*?)>>/i);
+  r.followups = m ? m[1].split('|').map(s => s.trim().replace(/^["'“]|["'”]$/g, '')).filter(s => s && s.length < 160).slice(0, 4) : [];
+  r.answer = r.answer.replace(/<<\s*f[\s\S]*$/i, '').replace(/\n?<<?\s*$/, '').trimEnd();
+  return r;
+}
+function splitThink0(raw) {
+  raw = raw || '';
+  const s = raw.indexOf('<think>');
+  if (s === -1) return {thought: '', answer: raw, thinking: false, has: false};
+  const e = raw.indexOf('</think>');
+  if (e === -1) return {thought: raw.slice(s + 7).trim(), answer: raw.slice(0, s).trim(), thinking: true, has: true};
+  return {thought: raw.slice(s + 7, e).trim(), answer: (raw.slice(0, s) + raw.slice(e + 8)).trim(), thinking: false, has: true};
+}
+function renderMD(src) {
+  const tools = [];
+  src = src.replace(/```meow-tool[^\n]*\n?([\s\S]*?)(?:```|$)/g, (m, body) => {
+    tools.push((body.match(/"op"\s*:\s*"([\w-]+)"/) || [])[1] || 'tool');
+    return `\n\n⟦T${tools.length - 1}⟧\n\n`;
+  });
+  const codes = [];
+  src = src.replace(/```[\s\S]*?(?:```|$)|`[^`\n]+`/g, m => { codes.push(m); return `⟦C${codes.length - 1}⟧`; });
+  const maths = [];
+  src = src.replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$(?=[^\s$])[^$\n]+?(?<=[^\s\\])\$(?!\d)/g, m => { maths.push(m); return `⟦M${maths.length - 1}⟧`; });
+  src = src.replace(/⟦C(\d+)⟧/g, (_, i) => codes[+i]);
+  let out = sanitize(mdParse(src));
+  out = out.replace(/⟦M(\d+)⟧/g, (_, i) => mathHTML(maths[+i]));
+  out = out.replace(/<p>\s*⟦T(\d+)⟧\s*<\/p>|⟦T(\d+)⟧/g, (_, a, b) => `<div class="tool-chip">${ic('wrench', 13)} Using tool <b>${esc(tools[+(a ?? b)])}</b></div>`);
+  return out;
+}
+let mermaidP = null;
+function loadMermaid() {
+  if (!mermaidP) mermaidP = new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+    s.onload = () => { try { mermaid.initialize({startOnLoad: false, theme: 'dark', securityLevel: 'strict', fontFamily: 'Arial, Helvetica, sans-serif'}); res(mermaid); } catch (e) { rej(e); } };
+    s.onerror = () => { mermaidP = null; rej(new Error('mermaid failed to load')); }; document.head.appendChild(s);
+  });
+  return mermaidP;
+}
+async function renderMermaid(pre, src) {
+  try {
+    const m = await loadMermaid(); const id = 'mm' + Math.random().toString(36).slice(2);
+    const {svg} = await m.render(id, src);
+    if (!pre.isConnected) return;
+    const box = document.createElement('div'); box.className = 'mermaid-box';
+    box.innerHTML = `<div class="mm-bar"><span>${ic('layers', 13)} Diagram</span><span><button data-act="mm-code">${ic('code', 13)}Code</button><button data-act="mm-svg">${ic('download', 13)}SVG</button></span></div><div class="mm-svg">${svg}</div>`;
+    box._src = src; box._svg = svg; pre.replaceWith(box); box._pre = pre;
+  } catch (e) { pre.querySelector('.code-bar span').textContent = 'mermaid (couldn\'t render)'; }
+}
+function enhance(root, live) {
+  root.querySelectorAll('img').forEach(img => { if (!img.closest('a')) { img.dataset.zoom = img.getAttribute('src'); img.loading = 'lazy'; } });
+  root.querySelectorAll('pre').forEach(pre => {
+    const code = pre.querySelector('code'); if (!code) return;
+    let lang = ((code.className.match(/language-([\w+#.-]+)/) || [])[1] || 'text').toLowerCase();
+    const bar = document.createElement('div'); bar.className = 'code-bar';
+    if (lang.startsWith('meow-output')) {
+      const err = lang.includes('error'); pre.classList.add('py-out'); if (err) pre.classList.add('err');
+      bar.innerHTML = `<span>${ic(err ? 'x' : 'terminal', 13)} ${err ? 'Error' : 'Output'}</span><span><button data-act="copy-code">${ic('copy', 13)}Copy</button></span>`;
+      pre.prepend(bar); return;
+    }
+    let label = lang, extra = '';
+    if (lang === 'meow-python') { pre.classList.add('py-code'); label = 'python · ran by Meow'; lang = 'python'; }
+    if (lang === 'html' || lang === 'svg') extra = `<button data-act="preview-html">${ic('eye', 13)}Preview</button>`;
+    bar.innerHTML = `<span>${esc(label)}</span><span>${extra}<button data-act="copy-code">${ic('copy', 13)}Copy</button><button data-act="save-code" data-lang="${esc(lang)}">${ic('download', 13)}Save</button></span>`;
+    pre.prepend(bar);
+    if (lang === 'mermaid' && !live) { renderMermaid(pre, code.textContent); return; }
+    if (!HAS.hl) return;
+    if (lang !== 'text' && hljs.getLanguage(lang)) { try { code.className = 'language-' + lang; hljs.highlightElement(code); } catch {} }
+    else if (lang === 'text' && code.textContent.length < 20000) { try { const r = hljs.highlightAuto(code.textContent); code.innerHTML = r.value; code.classList.add('hljs'); } catch {} }
+  });
+}
+function previewHTML(src) {
+  let ov = $('#htmlPrev');
+  if (!ov) {
+    ov = document.createElement('div'); ov.id = 'htmlPrev'; ov.className = 'html-prev hidden';
+    ov.innerHTML = `<div class="hp-card glass"><div class="hp-bar"><b>${ic('eye', 15)} Live preview</b><span><button class="btn" data-hp="tab">${ic('share', 14)}New tab</button><button class="btn" data-hp="close">${ic('x', 14)}</button></span></div><iframe sandbox="allow-scripts allow-forms allow-modals allow-popups" referrerpolicy="no-referrer"></iframe></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => {
+      const b = e.target.closest('[data-hp]');
+      if (e.target === ov || b?.dataset.hp === 'close') ov.classList.add('hidden');
+      else if (b?.dataset.hp === 'tab') window.open(URL.createObjectURL(new Blob([ov._src], {type: 'text/html'})), '_blank');
+    });
+  }
+  ov._src = /<html|<body|<!doctype/i.test(src) ? src : `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${src}</body></html>`;
+  ov.querySelector('iframe').srcdoc = ov._src; ov.classList.remove('hidden');
+}
+function addCaret(root) {
+  let n = root.lastElementChild;
+  while (n && ['UL', 'OL', 'LI', 'BLOCKQUOTE'].includes(n.tagName) && n.lastElementChild) n = n.lastElementChild;
+  if (n && !['PRE', 'TABLE', 'DIV', 'HR'].includes(n.tagName)) n.insertAdjacentHTML('beforeend', '<span class="caret"></span>');
+  else root.insertAdjacentHTML('beforeend', '<span class="caret"></span>');
+}
+
+/* ---------------- chat list ---------------- */
+function renderChatList() {
+  const q = $('#chatSearch').value.trim().toLowerCase(), list = $('#chatList');
+  const items = chats.slice().sort((a, b) => b.updated - a.updated)
+    .filter(c => !q || c.title.toLowerCase().includes(q) || c.messages.some(m => (m.content || '').toLowerCase().includes(q)));
+  if (!items.length) { list.innerHTML = `<div class="empty" style="padding:14px">${q ? 'No matches' : 'No chats yet — say meow 🐾'}</div>`; return; }
+  const today = new Date(new Date().toDateString()).getTime();
+  const grp = t => { const d = (today - new Date(new Date(t).toDateString()).getTime()) / 864e5; return d < 1 ? 'Today' : d < 2 ? 'Yesterday' : d < 7 ? 'This week' : 'Earlier'; };
+  let h = '', last = '';
+  for (const c of items) {
+    const g = grp(c.updated); if (g !== last) { h += `<div class="cl-group">${g}</div>`; last = g; }
+    h += `<div class="cl-item ${c.id === activeId ? 'active' : ''}" data-id="${c.id}">${ic('chat', 15)}<span class="t">${esc(c.title)}</span><button class="del" data-del="${c.id}" title="Delete">${ic('trash', 14)}</button></div>`;
+  }
+  list.innerHTML = h;
+}
+$('#chatList').addEventListener('click', e => {
+  const d = e.target.closest('[data-del]');
+  if (d) { e.stopPropagation(); if (busy && d.dataset.del === activeId) return toast('Stop the reply first');
+    if (confirm('Delete this chat?')) { chats = chats.filter(c => c.id !== d.dataset.del); if (activeId === d.dataset.del) activeId = null; save(); renderChatList(); renderChat(); } return; }
+  const it = e.target.closest('.cl-item'); if (!it) return;
+  if (busy) return toast('Wait for the reply to finish (or stop it)');
+  activeId = it.dataset.id; renderChatList(); renderChat(); closeSidebarMobile();
+});
+$('#chatSearch').addEventListener('input', renderChatList);
+
+/* ---------------- rendering messages ---------------- */
+function userEl(m) {
+  const d = document.createElement('div'); d.className = 'msg user';
+  const att = (m.files || []).map(f => f.kind === 'image'
+    ? `<img class="att-img" src="/api/thumb/${f.id}?size=600" data-zoom="/api/thumb/${f.id}?size=1600" alt="${esc(f.name)}" onerror="this.style.display='none'">`
+    : f.kind === 'pdf' ? `<button class="att-chip" style="border:0;cursor:pointer" data-act="edit-pdf" data-id="${f.id}" title="Open in PDF editor">${ic('file', 14)}${esc(f.name)} ${ic('pen', 12)}</button>`
+    : `<span class="att-chip">${ic(KIND_ICON[f.kind] || 'file', 14)}${esc(f.name)}</span>`).join('');
+  d._msg = m;
+  d.innerHTML = `<div class="u-wrap"><div class="bubble">${att ? `<div class="att">${att}</div>` : ''}${esc(m.content)}</div>
+    <div class="u-acts"><button data-act="copy-user" title="Copy">${ic('copy', 14)}</button><button data-act="edit-user" title="Edit and resend">${ic('pen', 14)}</button></div></div>`;
+  return d;
+}
+function assistantEl(m) {
+  const d = document.createElement('div'); d.className = 'msg assistant'; d._msg = m;
+  d.innerHTML = `<div class="avatar">${CAT}</div><div class="a-body">
+    <div class="a-name">Meow <span class="mode-tag ${m.mode === 'think' ? 'm-think' : 'm-fast'}">${m.mode === 'think' ? '🧠 Think' : '⚡ Fast'}</span><span class="status-line"></span></div>
+    <div class="web-panel hidden"></div>
+    <details class="think hidden"><summary><span class="orb"></span><span class="tl">Thinking…</span><span class="chev">${ic('chev', 14)}</span></summary><div class="think-body"></div></details>
+    <div class="md answer"></div><div class="tools"></div><div class="fups"></div><div class="actions"></div></div>`;
+  const det = d.querySelector('details.think');
+  det.addEventListener('toggle', () => { if (det.open !== det._want) det._user = true; });
+  updateAssistant(d, m, false); renderTools(d, m); renderActions(d, m);
+  return d;
+}
+function updateAssistant(d, m, live) {
+  const {thought, answer, thinking, has, followups} = splitThink(m.content);
+  const fu = d.querySelector('.fups');
+  if (fu) fu.innerHTML = !live && followups.length ? followups.map(q => `<button class="fup" data-act="followup" data-q="${esc(q)}">${ic('chev', 13)}<span>${esc(q)}</span></button>`).join('') : '';
+  const det = d.querySelector('details.think');
+  if (has) {
+    det.classList.remove('hidden');
+    const body = det.querySelector('.think-body');
+    const stick = body.scrollHeight - body.scrollTop - body.clientHeight < 40;
+    body.textContent = thought || '…';
+    if (stick) body.scrollTop = body.scrollHeight;
+    const secs = thinking && live && m._t0 ? Math.round((Date.now() - m._t0) / 1000) : m.thinkSecs;
+    det.querySelector('.tl').textContent = thinking && live ? `Thinking deeply… ${secs || 0}s` : (secs != null ? `Thought for ${secs}s` : 'Thought process');
+    det.querySelector('.orb').classList.toggle('done', !(thinking && live));
+    if (!det._user) { const want = !!(thinking && live); if (det.open !== want) { det._want = want; det.open = want; } }
+  } else det.classList.add('hidden');
+  renderWeb(d, m, live);
+  const ans = d.querySelector('.answer');
+  if (answer) { ans.innerHTML = renderMD(answer); linkCites(ans, m.sources); enhance(ans, live); if (live) addCaret(ans); }
+  else if (live && !thinking) ans.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>';
+  else ans.innerHTML = (!live && m.stopped && !answer) ? '<em style="color:var(--dim)">Stopped.</em>' : '';
+  d.querySelector('.status-line').textContent = live && m._status ? '· ' + m._status : '';
+  d.querySelector('.avatar').classList.toggle('busy', !!live);
+}
+const fav = dm => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(dm)}&sz=32`;
+const SRC_KIND = {youtube: ['YouTube', 'yt'], wiki: ['Wikipedia', 'wk'], paper: ['Paper', 'pp'], code: ['Code', 'cd'], hn: ['Hacker News', 'hn'], link: ['Your link', 'lk'], news: ['News', 'nw']};
+function renderWeb(d, m, live) {
+  const p = d.querySelector('.web-panel'), s = m.search, src = m.sources || [], imgs = m.images || [];
+  if (!s || (s.stage === 'skipped' && !src.length)) { p.classList.add('hidden'); return; }
+  const busyW = live && !['done', 'error', 'skipped'].includes(s.stage);
+  const key = [s.stage, s.round, src.length, busyW, (s.queries || []).length, imgs.length].join('|'); if (p._key === key) return; p._key = key;
+  p.classList.remove('hidden');
+  const nq = (s.queries || []).length, nr = src.filter(x => x.kind === 'reddit').length, nl = (s.links || []).length;
+  const xs = (s.sources || []).filter(x => x !== 'news').map(x => ({youtube: 'YouTube', wiki: 'Wikipedia', papers: 'papers', code: 'GitHub + Stack Overflow', hn: 'Hacker News'}[x])).filter(Boolean);
+  const where = ['the web'].concat(s.reddit ? ['Reddit'] : [], xs).join(', ').replace(/, ([^,]*)$/, ' and $1');
+  const label = s.stage === 'links' ? `Reading ${nl} link${nl > 1 ? 's' : ''} you shared…`
+    : s.stage === 'planning' ? 'Figuring out what to search…'
+    : s.stage === 'searching' ? `Searching ${where}…`
+    : s.stage === 'reading' ? `Reading the best of ${s.found || 0} results…`
+    : s.stage === 'checking' ? 'Checking if this really answers your question…'
+    : s.stage === 'deeper' ? `Round ${s.round || 2}: ${esc(s.missing || 'digging deeper')}${(s.subs || []).length ? ' · searching ' + s.subs.map(x => 'r/' + esc(x)).join(', ') : ''}`
+    : s.stage === 'error' ? `Search failed — answering from memory (${esc(s.error || '')})`
+    : (s.rounds > 1 ? `${s.rounds} search rounds · ` : '') + (nq ? `Searched ${nq} quer${nq === 1 ? 'y' : 'ies'} · ` : '') + `used ${src.length} source${src.length === 1 ? '' : 's'}${nr ? ` (${nr} from Reddit)` : ''}${nl ? ` · read ${nl} link${nl > 1 ? 's' : ''}` : ''}`;
+  const q = (s.queries || []).map(x => `<span>${ic('search', 11)}${esc(x)}</span>`).join('') + (s.reddit ? `<span class="r">${ic('reddit', 11)}Reddit</span>` : '')
+    + xs.map(x => `<span class="x">${ic('layers', 11)}${esc(x)}</span>`).join('');
+  const cards = src.map(x => { const k = SRC_KIND[x.kind];
+    const sub = x.kind === 'reddit' ? `r/${esc(x.sub || '?')}${x.score != null ? ` · ▲${x.score}` : ''}` : esc(x.domain);
+    return `<a class="src ${x.kind === 'reddit' ? 'reddit' : ''} ${k ? 'k-' + k[1] : ''}" href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(x.snippet || x.title)}">
+    ${k ? `<span class="kb">${k[0]}</span>` : ''}<span class="st">${esc(x.title)}</span>
+    <span class="sd"><img src="${fav(x.domain)}" alt="" loading="lazy" onerror="this.style.display='none'"><span class="dm">${sub}${x.date ? ' · ' + esc(String(x.date).slice(0, 10)) : ''}</span><span class="n">${x.n}</span></span></a>`; }).join('');
+  const strip = imgs.length ? `<div class="img-row">${imgs.map(i => `<a href="${esc(i.link || i.img)}" target="_blank" rel="noopener" title="${esc(i.title)} — ${esc(i.site || '')}"><img src="${esc(i.thumb || i.img)}" alt="${esc(i.title)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.remove()"></a>`).join('')}</div>` : '';
+  p.innerHTML = `<div class="wp-head">${busyW ? '<span class="orb"></span>' : ic('globe', 15)}<span>${label}</span></div>${q ? `<div class="wp-q">${q}</div>` : ''}${strip}${cards ? `<div class="src-row">${cards}</div>` : ''}`;
+}
+function linkCites(root, src) {
+  if (!src || !src.length) return;
+  const by = {}; src.forEach(s => by[s.n] = s);
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {acceptNode: n => n.parentElement.closest('pre,code,a,.katex') ? NodeFilter.FILTER_REJECT : (/\[\d{1,2}\]/.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP)});
+  const nodes = []; while (w.nextNode()) nodes.push(w.currentNode);
+  nodes.forEach(n => {
+    const h = esc(n.nodeValue).replace(/\[(\d{1,2})\]/g, (x, k) => { const s = by[+k]; return s ? `<a class="cite${s.kind === 'reddit' ? ' r' : ''}" href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.title)} — ${esc(s.kind === 'reddit' ? 'r/' + (s.sub || '') : s.domain)}">${k}</a>` : x; });
+    const sp = document.createElement('span'); sp.innerHTML = h; n.replaceWith(...sp.childNodes);
+  });
+}
+function fileCard(f, msg) {
+  return `<div class="fcard">${thumb(f)}<div class="info"><div class="nm">${esc(f.name)}</div><div class="mt">${esc(msg || metaStr(f))}</div></div>
+  <div class="acts"><a href="/api/files/${f.id}" target="_blank" rel="noopener" title="Open">${ic('eye', 16)}</a><a href="/api/files/${f.id}?dl=1" title="Download">${ic('download', 16)}</a>${f.kind === 'pdf' || f.kind === 'image' ? `<button data-act="edit-pdf" data-id="${f.id}" title="Open in editor">${ic('pen', 16)}</button>` : ''}<button data-act="attach" data-id="${f.id}" title="Attach to next message">${ic('clip', 16)}</button></div></div>`;
+}
+function renderTools(d, m) {
+  d.querySelector('.tools').innerHTML = (m.tools || []).map(t => {
+    if (t.status === 'running') return `<div class="fcard"><div class="th"><span class="spin"></span></div><div class="info"><div class="nm">Running ${esc(t.op)}…</div><div class="mt">Working on your file</div></div></div>`;
+    if (t.status === 'error') return `<div class="fcard err"><div class="th" style="color:var(--bad)">${ic('x', 18)}</div><div class="info"><div class="nm">${esc(t.op)} failed</div><div class="mt">${esc(t.error || 'Unknown error')}</div></div></div>`;
+    return fileCard(t.file, t.message);
+  }).join('');
+}
+function renderActions(d, m) {
+  const chat = activeChat(); const isLast = chat && chat.messages[chat.messages.length - 1] === m;
+  const st = m.stats && m.stats.tokens ? `<span class="stats">${m.stats.tps} tok/s · ${m.stats.tokens} tokens · ${m.stats.secs}s</span>` : '';
+  d.querySelector('.actions').innerHTML = `<button data-act="copy-msg" title="Copy">${ic('copy', 15)}</button>${isLast ? `<button data-act="regen" title="Regenerate">${ic('refresh', 15)}</button>` : ''}<button data-act="speak" title="Read aloud">${ic('volume', 15)}</button>${st}`;
+}
+function renderChat() {
+  const chat = activeChat(), box = $('#messages');
+  box.innerHTML = '';
+  $('#welcome').classList.toggle('hidden', !!(chat && chat.messages.length));
+  if (!chat) return;
+  chat.messages.forEach(m => box.appendChild(m.role === 'user' ? userEl(m) : assistantEl(m)));
+  scrollBottom();
+}
+
+$('#messages').addEventListener('click', e => {
+  const z = e.target.closest('[data-zoom]'); if (z) return openLightbox(z.dataset.zoom);
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, m = b.closest('.msg')?._msg;
+  if (act === 'copy-code') { copyText(b.closest('pre').querySelector('code').innerText); b.innerHTML = ic('check', 13) + 'Copied'; setTimeout(() => b.innerHTML = ic('copy', 13) + 'Copy', 1500); }
+  else if (act === 'save-code') { const l = b.dataset.lang; download(new Blob([b.closest('pre').querySelector('code').innerText], {type: 'text/plain'}), 'meow-snippet.' + (EXT[l] || (/^[a-z0-9]{1,6}$/.test(l) ? l : 'txt'))); }
+  else if (act === 'copy-msg' && m) { copyText(splitThink(m.content).answer.replace(/```meow-tool[\s\S]*?```/g, '').trim()); toast('Copied 🐾'); }
+  else if (act === 'regen') regenerate();
+  else if (act === 'speak' && m) speak(splitThink(m.content).answer);
+  else if (act === 'preview-html') previewHTML(b.closest('pre').querySelector('code').innerText);
+  else if (act === 'mm-code') { const box = b.closest('.mermaid-box'); box.replaceWith(box._pre); }
+  else if (act === 'mm-svg') { const box = b.closest('.mermaid-box'); download(new Blob([box._svg], {type: 'image/svg+xml'}), 'meow-diagram.svg'); }
+  else if (act === 'copy-user' && m) { copyText(m.content); toast('Copied 🐾'); }
+  else if (act === 'edit-user' && m) startEditMsg(m);
+  else if (act === 'followup') { if (busy) return; input.value = b.dataset.q; autosize(); sendMessage(); }
+  else if (act === 'attach') attachExisting(b.dataset.id);
+  else if (act === 'edit-pdf') openEditor(b.dataset.id);
+});
+
+/* ---------------- uploads ---------------- */
+async function uploadFiles(fileList, toComposer = true) {
+  const arr = [...fileList]; if (!arr.length) return [];
+  const items = arr.map(f => ({tmp: uid(), name: f.name, kind: guessKind(f.name), size: f.size, status: 'uploading', meta: {},
+    previewUrl: f.type.startsWith('image/') && !/hei[cf]$/i.test(f.name) ? URL.createObjectURL(f) : null}));
+  if (toComposer) { pending.push(...items); renderPending(); }
+  const fd = new FormData(); arr.forEach(f => fd.append('files', f, f.name));
+  try {
+    const r = await fetch('/api/upload', {method: 'POST', body: fd, headers: HDR});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    (await r.json()).files.forEach((rec, i) => Object.assign(items[i], rec, {status: 'ready'}));
+  } catch (e) { items.forEach(it => it.status = 'error'); toast('Upload failed: ' + e.message, 'err'); }
+  if (toComposer) renderPending();
+  return items;
+}
+function renderPending() {
+  const box = $('#pending'); box.classList.toggle('hidden', !pending.length);
+  box.innerHTML = pending.map((p, i) => `<div class="chip ${p.status === 'error' ? 'err' : ''}">${p.status === 'uploading' ? '<div class="th"><span class="spin"></span></div>' : thumb(p)}
+    <div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="mt">${p.status === 'uploading' ? 'Reading…' : p.status === 'error' ? 'Upload failed' : esc(metaStr(p))}</div></div>
+    <button class="x" data-rm="${i}" title="Remove">${ic('x', 12)}</button></div>`).join('');
+}
+$('#pending').addEventListener('click', e => {
+  const r = e.target.closest('[data-rm]'); if (r) { pending.splice(+r.dataset.rm, 1); renderPending(); return; }
+  const z = e.target.closest('[data-zoom]'); if (z) openLightbox(z.dataset.zoom);
+});
+$('#attachBtn').onclick = () => $('#fileInput').click();
+$('#fileInput').onchange = e => { uploadFiles(e.target.files); e.target.value = ''; };
+async function loadLib() { try { const r = await fetch('/api/files', {headers: HDR}); lib = (await r.json()).files || []; } catch { lib = []; } }
+async function attachExisting(id) {
+  let f = lib.find(x => x.id === id); if (!f) { await loadLib(); f = lib.find(x => x.id === id); }
+  if (!f) return toast('File not found on server', 'err');
+  if (!pending.some(p => p.id === id)) pending.push({...f, status: 'ready'});
+  renderPending(); closeTools(); toast('Attached ' + f.name); $('#input').focus();
+}
+
+/* ---------------- generation ---------------- */
+function historyFor(chat, upto) {
+  return chat.messages.slice(0, upto).map(m => {
+    let c = m.content || '';
+    if (m.role === 'assistant') {
+      c = splitThink(c).answer;
+      if (m.tools && m.tools.length) c += '\n\n[Tool results: ' + m.tools.map(t => t.status === 'ok' ? `${t.op} → ${t.file.name} (id=${t.file.id})` : `${t.op} failed: ${t.error}`).join('; ') + ']';
+    } else if (m.files && m.files.length) c = `[Attached: ${m.files.map(f => `${f.name} (id=${f.id})`).join(', ')}]\n${c}`;
+    return {role: m.role, content: c};
+  }).filter(x => x.content.trim());
+}
+function setBusy(b) {
+  busy = b; const s = $('#sendBtn');
+  s.classList.toggle('stop', b); s.innerHTML = ic(b ? 'stop' : 'send', 18); s.title = b ? 'Stop (Esc)' : 'Send';
+  warpTarget = b ? (mode === 'think' ? 0.5 : 0.16) : 0;
+}
+function schedule() {
+  if (rTimer) return;
+  rTimer = setTimeout(() => { rTimer = null; if (!liveEl) return; const stick = nearBottom(); updateAssistant(liveEl, liveMsg, true); if (stick) scrollBottom(); }, 45);
+}
+let editing = null;
+function startEditMsg(m) {
+  if (busy) return toast('Stop the current reply first');
+  const chat = activeChat(); const idx = chat ? chat.messages.indexOf(m) : -1; if (idx < 0) return;
+  editing = {idx};
+  input.value = m.content; autosize(); input.focus();
+  pending = (m.files || []).map(f => ({...f, status: 'ready'})); renderPending();
+  $('#editBar').classList.remove('hidden');
+}
+function cancelEdit() { editing = null; $('#editBar').classList.add('hidden'); input.value = ''; pending = []; renderPending(); autosize(); }
+$('#editCancel').onclick = cancelEdit;
+async function sendMessage() {
+  if (busy) return stopGen();
+  if (pending.some(p => p.status === 'uploading')) return toast('Hold on — files are still uploading 🐾');
+  const input = $('#input'), text = input.value.trim(), ready = pending.filter(p => p.status === 'ready');
+  if (!text && !ready.length) return;
+  let chat = activeChat(); if (!chat) { chat = newChat(); activeId = chat.id; }
+  if (editing) { chat.messages = chat.messages.slice(0, editing.idx); editing = null; $('#editBar').classList.add('hidden'); }
+  ready.forEach(f => { if (!chat.fileIds.includes(f.id)) chat.fileIds.push(f.id); });
+  chat.messages.push({role: 'user', content: text, files: ready.map(({id, name, kind, size, meta}) => ({id, name, kind, size, meta}))});
+  if (chat.messages.length === 1) chat.title = (text || ready.map(f => f.name).join(', ')).slice(0, 48);
+  pending = []; renderPending(); input.value = ''; autosize();
+  await generate(chat);
+}
+async function generate(chat) {
+  const m = {role: 'assistant', content: '', mode, web: webMode, tools: []};
+  chat.messages.push(m); chat.updated = Date.now();
+  renderChatList(); renderChat();
+  const el = $('#messages').lastElementChild;
+  liveEl = el; liveMsg = m; setBusy(true); updateAssistant(el, m, true); scrollBottom();
+  const rid = uid(); currentRid = rid; abortCtl = new AbortController();
+  const idx = chat.messages.length - 2;
+  const body = {prompt: chat.messages[idx].content || '', mode, web: webMode, history: historyFor(chat, idx), file_ids: chat.fileIds, rid, chat_id: chat.id};
+  try {
+    const res = await fetch('/api/chat', {method: 'POST', headers: {...HDR, 'Content-Type': 'application/json'}, body: JSON.stringify(body), signal: abortCtl.signal});
+    if (!res.ok) throw new Error('server returned ' + res.status);
+    const reader = res.body.getReader(), dec = new TextDecoder(); let buf = '';
+    while (true) {
+      const {done, value} = await reader.read(); if (done) break;
+      buf += dec.decode(value, {stream: true});
+      let i;
+      while ((i = buf.indexOf('\n\n')) !== -1) {
+        const evt = buf.slice(0, i); buf = buf.slice(i + 2);
+        for (const line of evt.split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim(); if (!data || data === '[DONE]') continue;
+          let j; try { j = JSON.parse(data); } catch { continue; }
+          if (j.t != null) {
+            m.content += j.t;
+            if (!m._t0 && m.content.includes('<think>')) m._t0 = Date.now();
+            if (m._t0 && m.thinkSecs == null && m.content.includes('</think>')) m.thinkSecs = Math.round((Date.now() - m._t0) / 1000);
+            schedule();
+          } else if (j.status != null) { m._status = j.status; schedule(); }
+          else if (j.search) { m.search = Object.assign(m.search || {}, j.search); schedule(); }
+          else if (j.sources) { m.sources = j.sources; schedule(); }
+          else if (j.images) { m.images = j.images; schedule(); }
+          else if (j.rollback) { m.content = m.content.slice(0, Math.max(0, m.content.length - j.rollback)); schedule(); }
+          else if (j.files) { j.files.forEach(f => { if (!chat.fileIds.includes(f.id)) chat.fileIds.push(f.id); if (!/^figure_/.test(f.name)) m.tools.push({op: 'python', status: 'ok', file: f, message: 'Created with Python'}); }); renderTools(el, m); }
+          else if (j.stats) m.stats = j.stats;
+        }
+      }
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') m.stopped = true;
+    else m.content += (m.content ? '\n\n' : '') + `⚠️ **Couldn't reach Meow's server** (${err.message}). Check that the Kaggle notebook cell is still running.`;
+  } finally {
+    if (m._t0 && m.thinkSecs == null) m.thinkSecs = Math.round((Date.now() - m._t0) / 1000);
+    clearTimeout(rTimer); rTimer = null; liveEl = null; m._status = '';
+    updateAssistant(el, m, false);
+    if (!m.stopped) await runToolCalls(chat, m, el);
+    setBusy(false); renderActions(el, m);
+    if (voiceOn) voiceAnswer(m);
+    chat.updated = Date.now(); save(); renderChatList();
+  }
+}
+function extractToolCalls(text) { const out = []; const re = /```meow-tool[^\n]*\n([\s\S]*?)```/g; let x; while ((x = re.exec(text))) out.push(x[1].trim()); return out; }
+async function runToolCalls(chat, m, el) {
+  const calls = extractToolCalls(splitThink(m.content).answer); if (!calls.length) return;
+  let last = '';
+  for (const raw of calls) {
+    const item = {op: (raw.match(/"op"\s*:\s*"([\w-]+)"/) || [])[1] || 'tool', status: 'running'};
+    m.tools.push(item); renderTools(el, m); if (nearBottom()) scrollBottom();
+    try {
+      const r = await api('/api/tool', {raw, last});
+      if (r.ok) { Object.assign(item, {status: 'ok', file: r.file, message: r.message}); last = r.file.id; if (!chat.fileIds.includes(r.file.id)) chat.fileIds.push(r.file.id); }
+      else Object.assign(item, {status: 'error', error: r.error});
+    } catch (e) { Object.assign(item, {status: 'error', error: e.message}); }
+    renderTools(el, m);
+  }
+  if (nearBottom()) scrollBottom();
+}
+function stopGen() {
+  if (!busy) return;
+  if (currentRid) api('/api/stop', {rid: currentRid}).catch(() => {});
+  abortCtl?.abort();
+}
+function regenerate() {
+  if (busy) return; const chat = activeChat(); if (!chat) return;
+  if (chat.messages[chat.messages.length - 1]?.role === 'assistant') chat.messages.pop();
+  if (chat.messages.length) generate(chat);
+}
+function speak(text) {
+  if (!('speechSynthesis' in window)) return toast('Speech not supported here', 'err');
+  if (speechSynthesis.speaking) { speechSynthesis.cancel(); return; }
+  const plain = text.replace(/```[\s\S]*?```/g, ' (code block) ').replace(/[#*_`>|~]/g, '').replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/\$+/g, '');
+  speechSynthesis.speak(new SpeechSynthesisUtterance(plain));
+}
+
+/* ---------------- composer ---------------- */
+const input = $('#input');
+function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 220) + 'px'; }
+input.addEventListener('input', autosize);
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !isTouch) { e.preventDefault(); sendMessage(); } });
+input.addEventListener('paste', e => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); uploadFiles(fs); } });
+$('#sendBtn').onclick = sendMessage;
+function setMode(m) {
+  mode = m; try { localStorage.setItem('meow_mode', m); } catch {}
+  const t = $('#modeToggle'); t.classList.toggle('think', m === 'think');
+  t.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  placePill();
+  input.placeholder = m === 'think' ? 'Ask something hard — Meow will think it through…' : 'Message Meow…';
+}
+function placePill() { const b = $(`#modeToggle button[data-mode="${mode}"]`); if (!b) return; const p = $('#modePill'); p.style.left = b.offsetLeft + 'px'; p.style.width = b.offsetWidth + 'px'; }
+$('#modeToggle').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
+
+/* voice */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition; let rec = null, listening = false, baseText = '';
+if (SR) {
+  rec = new SR(); rec.interimResults = true; rec.lang = navigator.language || 'en-IN';
+  rec.onstart = () => { listening = true; baseText = input.value; $('#micBtn').classList.add('mic-on'); };
+  rec.onresult = e => { let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; input.value = (baseText ? baseText + ' ' : '') + t; autosize(); };
+  rec.onend = () => { listening = false; $('#micBtn').classList.remove('mic-on'); };
+  rec.onerror = e => { if (e.error !== 'no-speech' && e.error !== 'aborted') toast('Mic: ' + e.error, 'err'); };
+}
+$('#camBtn').onclick = () => $('#camInput').click();
+$('#camInput').onchange = e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) { uploadFiles(fs); if (!input.value.trim()) { input.value = 'What is in this photo? Read any text and explain it.'; autosize(); } } };
+
+/* ---------------- voice mode (hands-free, Astra-style) ---------------- */
+let voiceOn = false, vRec = null, vState = 'idle', vPaused = false, vHeard = '';
+function vSet(state, text) {
+  vState = state; const ov = $('#voiceOv');
+  ov.classList.remove('listening', 'thinking', 'speaking', 'paused'); ov.classList.add(vPaused ? 'paused' : state);
+  $('#voState').textContent = vPaused ? 'Paused — tap the mic to resume' : {listening: 'Listening…', thinking: 'Thinking…', speaking: 'Speaking…'}[state] || '';
+  if (text != null) $('#voText').textContent = text;
+}
+function voiceStart() {
+  if (!SR) return toast('Voice mode needs Chrome or Edge (speech recognition)', 'err');
+  if (busy) return toast('Wait for the current reply to finish');
+  voiceOn = true; vPaused = false; $('#voiceOv').classList.remove('hidden'); vListen();
+}
+function voiceStop() {
+  voiceOn = false; try { vRec && vRec.abort(); } catch {} try { speechSynthesis.cancel(); } catch {}
+  $('#voiceOv').classList.add('hidden'); if (busy) stopGen();
+}
+function vListen() {
+  if (!voiceOn || vPaused) return;
+  vHeard = ''; vSet('listening', '');
+  vRec = new SR(); vRec.lang = navigator.language || 'en-IN'; vRec.interimResults = true; vRec.continuous = false;
+  vRec.onresult = e => { let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; vHeard = t; $('#voText').textContent = t; };
+  vRec.onerror = e => { if (e.error === 'not-allowed') { toast('Microphone permission denied', 'err'); voiceStop(); } };
+  vRec.onend = () => {
+    if (!voiceOn || vPaused || vState !== 'listening') return;
+    const t = vHeard.trim();
+    if (!t) return setTimeout(vListen, 250);
+    vSet('thinking', t); input.value = t; autosize(); sendMessage();
+  };
+  try { vRec.start(); } catch { setTimeout(vListen, 400); }
+}
+function speakable(md) {
+  return md.replace(/```[\s\S]*?```/g, ' (I put the code on screen) ').replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[(\d{1,2})\]/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/<<[\s\S]*$/, '')
+    .replace(/^\s*\|.*\|\s*$/gm, '').replace(/[#*_`>~|]/g, '').replace(/\$\$?([^$]+)\$\$?/g, '$1').replace(/\n{2,}/g, '. ').replace(/\s+/g, ' ').trim();
+}
+function voiceAnswer(m) {
+  if (!voiceOn) return;
+  const text = speakable(splitThink(m.content).answer).slice(0, 2400);
+  if (!text) return vListen();
+  vSet('speaking', text);
+  const parts = text.match(/[^.!?।]+[.!?।]+["')]*|\S[^.!?।]*$/g) || [text];
+  const hindi = /[\u0900-\u097F]/.test(text);
+  const voices = speechSynthesis.getVoices();
+  const voice = voices.find(v => hindi ? /^hi/i.test(v.lang) : /en-IN/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang) && /Google|Natural|Neural/i.test(v.name)) || null;
+  speechSynthesis.cancel();
+  parts.forEach((p, i) => {
+    const u = new SpeechSynthesisUtterance(p.trim()); if (voice) u.voice = voice; u.lang = voice?.lang || (hindi ? 'hi-IN' : 'en-IN'); u.rate = 1.04;
+    if (i === parts.length - 1) u.onend = () => { if (voiceOn) setTimeout(vListen, 200); };
+    speechSynthesis.speak(u);
+  });
+}
+$('#voiceBtn').onclick = voiceStart;
+$('#voEnd').onclick = voiceStop;
+$('#voMute').onclick = () => {
+  vPaused = !vPaused; $('#voMute').classList.toggle('off', vPaused);
+  if (vPaused) { try { vRec && vRec.abort(); } catch {} try { speechSynthesis.cancel(); } catch {} vSet(vState); }
+  else vListen();
+};
+try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => {}; } catch {}
+
+$('#micBtn').onclick = () => { if (!rec) return toast('Voice input needs Chrome or Edge', 'err'); listening ? rec.stop() : rec.start(); };
+
+/* drag & drop */
+let dragDepth = 0; const main = $('#main');
+window.addEventListener('dragover', e => e.preventDefault()); window.addEventListener('drop', e => e.preventDefault());
+main.addEventListener('dragenter', e => { if (![...(e.dataTransfer?.types || [])].includes('Files')) return; dragDepth++; $('#dropOverlay').classList.remove('hidden'); });
+main.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('#dropOverlay').classList.add('hidden'); } });
+main.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('#dropOverlay').classList.add('hidden'); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
+
+/* welcome suggestions */
+document.querySelectorAll('.suggest').forEach(s => s.addEventListener('click', () => {
+  if (s.dataset.mode) setMode(s.dataset.mode);
+  if (s.dataset.web) setWeb(s.dataset.web);
+  input.value = s.dataset.prompt; autosize(); input.focus();
+  if (s.dataset.attach) $('#fileInput').click();
+}));
+$('#greet').textContent = USER_NAME ? `Hey ${USER_NAME} 🐾 What are we working on today?` : 'What are we working on today?';
+
+/* ---------------- sidebar, export, lightbox, keys ---------------- */
+const appEl = $('#app');
+const isMobile = () => innerWidth <= 820;
+$('#menuBtn').onclick = () => isMobile() ? appEl.classList.toggle('sb-open') : appEl.classList.toggle('sb-collapsed');
+function closeSidebarMobile() { appEl.classList.remove('sb-open'); }
+$('#sbClose').onclick = closeSidebarMobile; $('#scrim').onclick = closeSidebarMobile;
+function newChatUI() { if (busy) return toast('Stop the current reply first'); activeId = null; pending = []; renderPending(); renderChatList(); renderChat(); closeSidebarMobile(); input.focus(); }
+$('#newChatBtn').onclick = newChatUI;
+$('#exportBtn').onclick = () => {
+  const c = activeChat(); if (!c || !c.messages.length) return toast('Nothing to export yet');
+  const md = `# ${c.title}\n\n` + c.messages.map(m => `### ${m.role === 'user' ? 'You' : 'Meow 🐈'}\n\n${m.role === 'user' ? m.content : splitThink(m.content).answer}`).join('\n\n---\n\n');
+  download(new Blob([md], {type: 'text/markdown'}), (c.title.replace(/[^\w-]+/g, '_').slice(0, 40) || 'chat') + '.md');
+};
+let webMode = 'auto'; try { webMode = localStorage.getItem('meow_web') || 'auto'; } catch {}
+const WEB_LBL = {auto: 'Auto', web: 'Web', reddit: 'Reddit', deep: 'Deep', off: 'Off'};
+function setWeb(w) {
+  if (!WEB_LBL[w]) w = 'auto';
+  webMode = w; try { localStorage.setItem('meow_web', w); } catch {}
+  const b = $('#webBtn'); $('#webLbl').textContent = WEB_LBL[w];
+  b.classList.toggle('on', w === 'web' || w === 'deep'); b.classList.toggle('rd', w === 'reddit'); b.classList.toggle('off', w === 'off');
+  b.title = {auto: 'Web search: Auto — searches when needed', web: 'Web search: always on', reddit: 'Searching Reddit', deep: 'Deep research', off: 'Web search off'}[w];
+  document.querySelectorAll('#webMenu button').forEach(x => x.classList.toggle('sel', x.dataset.web === w));
+}
+$('#webBtn').addEventListener('click', e => { e.stopPropagation(); $('#webMenu').classList.toggle('hidden'); });
+$('#webMenu').addEventListener('click', e => { const b = e.target.closest('button[data-web]'); if (!b) return; setWeb(b.dataset.web); $('#webMenu').classList.add('hidden'); input.focus(); });
+document.addEventListener('click', e => { if (!e.target.closest('#webPick')) $('#webMenu').classList.add('hidden'); });
+
+function openLightbox(src) { const lb = $('#lightbox'); lb.querySelector('img').src = src; lb.classList.remove('hidden'); }
+$('#lightbox').onclick = () => $('#lightbox').classList.add('hidden');
+document.addEventListener('keydown', e => {
+  if (!$('#pdfEditor').classList.contains('hidden')) return;
+  if (e.key === 'Escape') {
+    if (editing) cancelEdit();
+    else if (!$('#voiceOv').classList.contains('hidden')) voiceStop();
+    else if (!$('#webMenu').classList.contains('hidden')) $('#webMenu').classList.add('hidden');
+    else if (!$('#lightbox').classList.contains('hidden')) $('#lightbox').classList.add('hidden');
+    else if (!$('#toolsModal').classList.contains('hidden')) closeTools();
+    else if (busy) stopGen();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); newChatUI(); }
+});
+
+/* ---------------- tools modal ---------------- */
+let toolSpecs = null, curTool = null, toolSel = [];
+async function openTools(op) {
+  $('#toolsModal').classList.remove('hidden'); closeSidebarMobile();
+  if (!toolSpecs) {
+    try { toolSpecs = (await (await fetch('/api/tools', {headers: HDR})).json()).tools;
+      toolSpecs.unshift({op: '__editor', group: 'PDF', label: '✏️ Visual editor (PDF & images)', desc: 'Click any text to edit it in its original font — even text inside photos, screenshots and scanned pages. Move, resize, replace or adjust images; draw, highlight, add shapes, erase, sign and manage pages.', accepts: ['pdf', 'image'], multi: false, params: []}); }
+    catch { toast('Could not load tools — is the server running?', 'err'); return; }
+    const groups = [...new Set(toolSpecs.map(t => t.group))];
+    $('#toolList').innerHTML = groups.map(g => `<div class="tl-group">${esc(g)}</div>` + toolSpecs.filter(t => t.group === g).map(t => `<div class="tl-item" data-op="${t.op}">${esc(t.label)}</div>`).join('')).join('');
+  }
+  await loadLib();
+  selectTool(op || curTool?.op || toolSpecs[0].op);
+}
+function closeTools() { $('#toolsModal').classList.add('hidden'); }
+$('#toolsBtn').onclick = () => openTools(); $('#sbTools').onclick = () => openTools(); $('#toolsClose').onclick = closeTools;
+$('#toolsModal').addEventListener('click', e => { if (e.target.id === 'toolsModal') closeTools(); });
+$('#toolList').addEventListener('click', e => { const it = e.target.closest('.tl-item'); if (it) selectTool(it.dataset.op); });
+function selectTool(op) {
+  curTool = toolSpecs.find(t => t.op === op); if (!curTool) return;
+  document.querySelectorAll('.tl-item').forEach(x => x.classList.toggle('on', x.dataset.op === op));
+  $('#toolTitle').textContent = curTool.label; $('#toolDesc').textContent = curTool.desc;
+  toolSel = toolSel.filter(id => { const f = lib.find(x => x.id === id); return f && curTool.accepts.includes(f.kind); });
+  if (!curTool.multi) toolSel = toolSel.slice(0, 1);
+  renderToolFiles();
+  $('#toolParams').innerHTML = curTool.params.map(paramHTML).join('');
+  $('#toolResult').innerHTML = '';
+  $('#toolRun').innerHTML = curTool.op === '__editor' ? ic('pen', 16) + 'Open editor' : ic('sparkles', 16) + 'Run';
+}
+function renderToolFiles() {
+  const wrap = $('#toolFilesWrap');
+  if (!curTool.accepts.length) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  $('#toolFilesHint').textContent = curTool.multi ? 'Pick files (click in the order you want)' : 'Pick a file';
+  const fs = lib.filter(f => curTool.accepts.includes(f.kind));
+  $('#toolFiles').innerHTML = fs.length ? fs.map(f => { const o = toolSel.indexOf(f.id);
+    return `<div class="tf ${o > -1 ? 'on' : ''}" data-fid="${f.id}">${thumb(f)}<div style="min-width:0"><div class="nm">${esc(f.name)}</div><div class="mt">${esc(metaStr(f))}</div></div>${o > -1 ? `<span class="ord">${curTool.multi ? o + 1 : '✓'}</span>` : ''}</div>`; }).join('')
+    : `<div class="empty">No ${curTool.accepts.join(' / ')} files yet — upload one.</div>`;
+}
+$('#toolFiles').addEventListener('click', e => {
+  const t = e.target.closest('.tf'); if (!t) return; const id = t.dataset.fid, i = toolSel.indexOf(id);
+  if (curTool.multi) { i > -1 ? toolSel.splice(i, 1) : toolSel.push(id); } else toolSel = i > -1 ? [] : [id];
+  renderToolFiles();
+});
+function paramHTML(p) {
+  const id = 'tp_' + p.name; let el;
+  if (p.type === 'select') el = `<select class="inp" id="${id}">${p.options.map(o => `<option ${String(o) === String(p.default) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  else if (p.type === 'textarea') el = `<textarea class="inp" id="${id}" placeholder="${esc(p.hint)}">${esc(p.default)}</textarea>`;
+  else el = `<input class="inp" id="${id}" type="${p.type === 'number' ? 'number' : p.type === 'password' ? 'password' : 'text'}" step="any" value="${esc(p.default)}" placeholder="${esc(p.hint)}">`;
+  return `<div class="flabel"><span>${esc(p.label)}</span></div>${el}`;
+}
+$('#toolUpload').onclick = () => $('#toolFileInput').click();
+$('#toolFileInput').onchange = async e => {
+  const items = await uploadFiles(e.target.files, false); e.target.value = '';
+  await loadLib();
+  items.filter(x => x.status === 'ready' && curTool.accepts.includes(x.kind)).forEach(x => { if (curTool.multi) toolSel.push(x.id); else toolSel = [x.id]; });
+  renderToolFiles();
+};
+$('#toolRun').onclick = async () => {
+  if (!curTool) return;
+  if (curTool.accepts.length && !toolSel.length) return toast('Pick a file first', 'err');
+  if (curTool.op === '__editor') return openEditor(toolSel[0]);
+  const params = {}; curTool.params.forEach(p => params[p.name] = document.getElementById('tp_' + p.name).value);
+  const btn = $('#toolRun'); btn.disabled = true; btn.innerHTML = '<span class="spin" style="width:16px;height:16px"></span>Working…';
+  try {
+    const r = await api('/api/tool', {op: curTool.op, files: toolSel, params});
+    $('#toolResult').innerHTML = r.ok ? fileCard(r.file, r.message)
+      : `<div class="fcard err"><div class="th" style="color:var(--bad)">${ic('x', 18)}</div><div class="info"><div class="nm">That didn't work</div><div class="mt">${esc(r.error)}</div></div></div>`;
+    if (r.ok) { await loadLib(); renderToolFiles(); }
+  } catch (e) { toast(e.message, 'err'); }
+  finally { btn.disabled = false; btn.innerHTML = ic('sparkles', 16) + 'Run'; }
+};
+$('#toolResult').addEventListener('click', e => {
+  const b = e.target.closest('[data-act="attach"]'); if (b) attachExisting(b.dataset.id);
+  const ep = e.target.closest('[data-act="edit-pdf"]'); if (ep) openEditor(ep.dataset.id);
+  const z = e.target.closest('[data-zoom]'); if (z) openLightbox(z.dataset.zoom);
+});
+
+/* ---------------- health ---------------- */
+async function health() {
+  try {
+    const j = await (await fetch('/api/health', {headers: HDR})).json();
+    $('#hdot').className = 'dot ok';
+    $('#healthText').textContent = `Online · ${Math.round(j.ctx / 1024)}k context`;
+    $('#modelBadge').textContent = `${j.model_short} · Kaggle GPU`;
+  } catch { $('#hdot').className = 'dot bad'; $('#healthText').textContent = 'Offline — is the Kaggle cell running?'; }
+}
+
+/* ---------------- galaxy: 3D starfield + shooting stars ---------------- */
+const sky = $('#sky'), sx = sky.getContext('2d');
+let W = 0, H = 0, stars = [], shooting = [], warp = 0, warpTarget = 0, nextShoot = 2500;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const STAR_COLORS = ['255,255,255', '205,218,255', '232,214,255', '255,236,214', '196,232,255'];
+function mkStar(fresh) { return {x: (Math.random() * 2 - 1) * W, y: (Math.random() * 2 - 1) * H, z: fresh ? W : Math.random() * W + 1, tw: Math.random() * 6.28, c: STAR_COLORS[Math.random() * STAR_COLORS.length | 0], px: null, py: null}; }
+function resizeSky() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+  sky.width = W * dpr; sky.height = H * dpr; sx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  stars = Array.from({length: Math.min(1100, Math.round(W * H / 1500))}, () => mkStar(false));
+}
+function tick(t) {
+  requestAnimationFrame(tick);
+  if (document.hidden) return;
+  warp += (warpTarget - warp) * 0.035;
+  sx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2, f = W * 0.5, speed = reduceMotion ? 0 : 0.35 + warp * 9;
+  for (const s of stars) {
+    s.z -= speed;
+    if (s.z < 1) { Object.assign(s, mkStar(true)); continue; }
+    const k = f / s.z, x = cx + s.x * k, y = cy + s.y * k;
+    if (x < -40 || x > W + 40 || y < -40 || y > H + 40) { Object.assign(s, mkStar(true)); continue; }
+    const depth = 1 - s.z / W, r = Math.max(0.25, depth * 1.9);
+    const a = (0.3 + 0.7 * depth) * (0.65 + 0.35 * Math.sin(t * 0.003 + s.tw));
+    if (warp > 0.08 && s.px != null) {
+      sx.strokeStyle = `rgba(${s.c},${a})`; sx.lineWidth = r; sx.beginPath(); sx.moveTo(s.px, s.py); sx.lineTo(x, y); sx.stroke();
+    } else {
+      sx.fillStyle = `rgba(${s.c},${a})`; sx.beginPath(); sx.arc(x, y, r, 0, 6.283); sx.fill();
+      if (depth > 0.86) { sx.fillStyle = `rgba(${s.c},${a * 0.12})`; sx.beginPath(); sx.arc(x, y, r * 4, 0, 6.283); sx.fill(); }
+    }
+    s.px = x; s.py = y;
+  }
+  if (!reduceMotion && t > nextShoot && shooting.length < 2) {
+    nextShoot = t + 3000 + Math.random() * 6000;
+    const ang = Math.PI * (0.12 + Math.random() * 0.22), v = 9 + Math.random() * 7;
+    shooting.push({x: Math.random() * W * 0.8, y: Math.random() * H * 0.35, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, life: 1});
+  }
+  shooting = shooting.filter(s => s.life > 0);
+  for (const s of shooting) {
+    s.x += s.vx; s.y += s.vy; s.life -= 0.018;
+    const tx = s.x - s.vx * 10, ty = s.y - s.vy * 10, g = sx.createLinearGradient(s.x, s.y, tx, ty);
+    g.addColorStop(0, `rgba(255,255,255,${s.life})`); g.addColorStop(1, 'rgba(167,139,250,0)');
+    sx.strokeStyle = g; sx.lineWidth = 2; sx.beginPath(); sx.moveTo(s.x, s.y); sx.lineTo(tx, ty); sx.stroke();
+  }
+}
+
+/* ---------------- boot ---------------- */
+hydrateIcons();
+setMode(mode); setWeb(webMode);
+document.fonts?.ready.then(placePill);
+addEventListener('resize', () => { resizeSky(); placePill(); });
+resizeSky(); requestAnimationFrame(tick);
+renderChatList(); renderChat();
+health(); setInterval(health, 25000);
+input.focus();
+})();
+</script>
+</body>
+</html>
