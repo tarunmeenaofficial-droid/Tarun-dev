@@ -32,7 +32,7 @@ t0 = time.time()
 PKGS = {"fitz": "pymupdf", "rapidocr_onnxruntime": "rapidocr_onnxruntime", "docx": "python-docx", "pptx": "python-pptx",
         "openpyxl": "openpyxl", "markdown": "markdown", "pillow_heif": "pillow-heif", "pyngrok": "pyngrok", "spandrel": "spandrel",
         "ddgs": "ddgs", "trafilatura": "trafilatura", "youtube_transcript_api": "youtube-transcript-api", "pdf2docx": "pdf2docx",
-        "huggingface_hub": "huggingface_hub", "hf_transfer": "hf_transfer", "fastapi": "fastapi", "uvicorn": "uvicorn",
+        "huggingface_hub": "huggingface_hub", "fastapi": "fastapi", "uvicorn": "uvicorn",
         "multipart": "python-multipart"}
 miss = [p for m, p in PKGS.items() if importlib.util.find_spec(m) is None]
 if miss:

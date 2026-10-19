@@ -10,8 +10,8 @@ GGUF = re.search(r'^GGUF_FILENAME = "([^"]+)"', src, re.M).group(1)
 pip = lambda *a: subprocess.run([sys.executable, "-m", "pip", *a], check=False)
 
 t0 = time.time()
-pip("install", "-q", "huggingface_hub", "hf_transfer")
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+pip("install", "-q", "-U", "huggingface_hub")
+os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
 from huggingface_hub import hf_hub_download
 print(f"⬇️  {REPO_ID}/{GGUF}", flush=True)
 hf_hub_download(repo_id=REPO_ID, filename=GGUF, local_dir=f"{W}/model")

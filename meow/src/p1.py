@@ -76,11 +76,7 @@ def _load_llm(ctx):
     if local:
         path = local[0]; print(f"📦 Using model from {os.path.dirname(path)}")
     else:
-        try:
-            import hf_transfer  # noqa: F401 — 5-10× faster downloads when installed
-            os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
-        except ImportError:
-            pass
+        os.environ.setdefault("HF_XET_HIGH_PERFORMANCE", "1")   # fastest download path in current huggingface_hub
         path = hf_hub_download(repo_id=REPO_ID, filename=GGUF_FILENAME)
     kw = dict(model_path=path, n_gpu_layers=-1, n_ctx=ctx, n_batch=512, verbose=False)
     try:
